@@ -219,11 +219,22 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 {
   char *mem;
   uint64 a;
+  int numToAdd;
+  struct proc *p = myproc();
 
   if(newsz < oldsz)
     return oldsz;
 
   oldsz = PGROUNDUP(oldsz);
+
+  // TODO: check if really round up
+  numToAdd = (PGROUNDUP(newsz) - oldsz) / PGSIZE;
+
+  if (p->pid > 2 && p->ramPages + p->swapPages + numToAdd > MAX_TOTAL_PAGES)
+        panic("Not enough space!");
+
+  // TODO: add here swap option for task 2
+
   for(a = oldsz; a < newsz; a += PGSIZE){
     mem = kalloc();
     if(mem == 0){
@@ -236,7 +247,13 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
       uvmdealloc(pagetable, a, oldsz);
       return 0;
     }
+
+    // Add the new allocated pages to our data structure
+    if(add_page((uint64) mem) == 0)
+      return 0;
+
   }
+
   return newsz;
 }
 
@@ -428,4 +445,48 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+
+int page_md_free(struct page_md* pagemd){
+    if(pagemd == 0)
+        return -1;
+    if(pagemd->isUsed){
+        pte_t* pte = walk(myproc()->pagetable, (void*)pagemd->va, 0);
+        if(pte == 0) 
+          panic("pte is 0 in page_md_free");
+        if ((*pte & PTE_V) != 0) {
+            uint64 pa = PTE2PA(*pte);
+            if (pa == 0)
+                panic("page_md_free");
+            pagemd->isUsed = 0;
+            pagemd->last_update_time = -1;
+            pagemd->va = -1;
+            //sfence_vma();
+            kfree((void*)pa);
+            return 1;
+        }
+    }
+    return -1;
+}
+
+int
+add_page(uint64 mem){
+  struct proc *p = myproc();
+  struct page_md* pagemd;
+  for (int i = 0; i < MAX_TOTAL_PAGES; i++) {
+      if (p->total_pages[i].stat == UNUSED) {
+          pagemd = &p->total_pages[i];
+      }
+  }
+
+  if(!page_md)
+    return 0;
+  
+  pagemd->isUsed = 1;
+  pagemd->last_update_time = ticks;
+  pagemd->va = mem;
+  pagemd->offset = 0;
+
+  return 0;
 }

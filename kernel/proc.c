@@ -305,10 +305,47 @@ fork(void)
 
   pid = np->pid;
 
+  if(np->pid < 2){
+    for(int i = 0; i < MAX_TOTAL_PAGES; i++){
+      np->total_pages[i]->isUsed = 0;
+      np->total_pages[i]->last_update_time = -1;
+      np->total_pages[i]->va = -1;
+    }
+  }
+
+  // init and sh don't have swap file
+  else if(np->pid >= 2){
+    // TODO: check if we're not holding keys here
+    createSwapFile(np);
+
+    // Deep copy of pages in file and memory
+    for (i = 0; i < MAX_PSYC_PAGES; i++) 
+        np->total_pages[i] = p->total_pages[i];
+    
+
+    char buf[PGSIZE / 2];
+    int offset = 0;
+    int readret = 0;
+
+    readret = readFromSwapFile(curproc, buf, offset, PGSIZE / 2)
+    while (readret) {
+        if (writeToSwapFile(np, buf, offset, readret) == -1)
+            panic("fork error: task 2.3 addition");
+        offset += numread;
+        readret = readFromSwapFile(curproc, buf, offset, PGSIZE / 2)
+    }
+
+
+    // TODO: copy file_pages pointers
+
+  }
+
   release(&np->lock);
 
   acquire(&wait_lock);
   np->parent = p;
+  np->ramPages = p->ramPages
+  np->swapPages = p->swapPages
   release(&wait_lock);
 
   acquire(&np->lock);
@@ -358,6 +395,8 @@ exit(int status)
   end_op();
   p->cwd = 0;
 
+  removeSwapFile(p);
+
   acquire(&wait_lock);
 
   // Give any children to init.
@@ -365,6 +404,12 @@ exit(int status)
 
   // Parent might be sleeping in wait().
   wakeup(p->parent);
+
+  struct page_md* currPage;
+  for(int i = 0; i < MAX_TOTAL_PAGES; i++){
+    currPage = &p->total_pages[i];
+    page_md_free(currPage);
+  }
   
   acquire(&p->lock);
 

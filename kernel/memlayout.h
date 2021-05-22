@@ -65,6 +65,3 @@
 //   TRAPFRAME (p->trapframe, used by the trampoline)
 //   TRAMPOLINE (the same page as in the kernel)
 #define TRAPFRAME (TRAMPOLINE - PGSIZE)
-
-
-#define PAGEDOUT(pte_flags) (pte_flags & PTE_PG) && !(pte_flags & ~PTE_v)

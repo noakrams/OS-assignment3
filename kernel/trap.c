@@ -68,10 +68,10 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
-    // TODO: check about kelloc thing (passed 1 to walk)
+    // TODO: check about kalloc thing (passed 1 to walk)
     uint64 scause = r_scause()
     uint64 stval = r_stval()
-    struct page_md currPage;
+    struct page_md* currPage;
     // TODO: maybe PGROUNDDOWN(stval) is not neccessery and stval is fine.
     uint64 va = PGROUNDDOWN(stval);
     pte_t *pte = walk(p->pagetable, (void *)va, 1);
@@ -81,33 +81,44 @@ usertrap(void)
       
       // Try and find the page with the requested va
       for(int i = 0 ; i < MAX_PSYC_PAGES ; i++){
-        if (p->file_pages[i].va == (uint64)stval) {
-            currPage = p->file_pages[i]
+        if (p->total_pages[i].va == (uint64)stval) {
+            currPage = &p->total_pages[i]
         }
       }
       
       // Check if there's not enough space or we didn't find the page with the requested va
-      if ((p->ramPages + p->swapPages > MAX_TOTAL_PAGES) || !currPage) {
+      if ((p->ramPages + p->swapPages >= MAX_TOTAL_PAGES) || !currPage || p->ramPages >= MAX_PSYC_PAGES) {
           printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
           printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-          p->killed = 1; // need 
+          p->killed = 1; // TODO: 
       }
 
-    // TODO: a page needs to be swapped!  --> TASK2
-    // if (this_proc->pages_in_ram + 1 >= MAX_PSYC_PAGES) {
-    //     if(swap_out() == -1)
-    //         return -1;
-    //     lcr3(V2P(this_proc->pgdir));
-    // }
-    
-    // Read data from swap file to the virtual address of the page
-    readFromSwapFile(p, (char*)currPage->va, currPage->offset, PGSIZE);
-    // refresh TLB
-    sfence_vma();
-    // Turn off swap bit
-    *pte &= ~PTE_PG;
-    // Turn on valid
-    *pte |= PTE_V;
+      // TODO: a page needs to be swapped!  --> TASK2
+      // if (this_proc->pages_in_ram + 1 >= MAX_PSYC_PAGES) {
+      //     if(swap_out() == -1)
+      //         return -1;
+      //     lcr3(V2P(this_proc->pgdir));
+      // }
+
+      // Read data from swap file to the virtual address of the page
+      if(ret = readFromSwapFile(p, (char*)currPage->va, currPage->offset * PGSIZE, PGSIZE) == -1)
+        panic("can't read from swap file");
+
+      // refresh TLB
+      // sfence_vma();
+      // Turn off swap bit
+      *pte &= ~PTE_PG;
+      // Turn on valid --> already done in walk...
+      // *pte |= PTE_V;
+
+      // Update process and current page
+      p->file_pages[currPage->offset] = 0;
+      currPage->offset = -1;
+      currPage->isUsed = 1;
+      currPage->last_update_time = ticks;
+      p->ramPages++;
+      p->swapPages--;
+
     }
 
   }

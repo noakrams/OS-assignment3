@@ -305,36 +305,36 @@ fork(void)
 
   pid = np->pid;
 
-  if(np->pid < 2){
-    for(int i = 0; i < MAX_TOTAL_PAGES; i++){
-      np->total_pages[i]->isUsed = 0;
-      np->total_pages[i]->last_update_time = -1;
-      np->total_pages[i]->va = -1;
-    }
-  }
+  // if(np->pid <= 2){
+  //   for(int i = 0; i < MAX_TOTAL_PAGES; i++){
+  //     np->total_pages[i]->isUsed = 0;
+  //     np->total_pages[i]->last_update_time = -1;
+  //     np->total_pages[i]->va = -1;
+  //   }
+  // }
 
   // init and sh don't have swap file
-  else if(np->pid >= 2){
+  if(np->pid > 2){
     // TODO: check if we're not holding keys here
     createSwapFile(np);
 
     // Deep copy of pages in file and memory
-    for (i = 0; i < MAX_PSYC_PAGES; i++) 
+    for (i = 0; i < MAX_TOTAL_PAGES; i++) 
         np->total_pages[i] = p->total_pages[i];
     
-
-    char buf[PGSIZE / 2];
+      
+      // TODO: maybe should be PGSIZE/2
+    char buf [PGSIZE];
     int offset = 0;
     int readret = 0;
-
-    readret = readFromSwapFile(curproc, buf, offset, PGSIZE / 2)
+    
+    readret = readFromSwapFile(p, buf, offset, PGSIZE);
     while (readret) {
         if (writeToSwapFile(np, buf, offset, readret) == -1)
             panic("fork error: task 2.3 addition");
-        offset += numread;
-        readret = readFromSwapFile(curproc, buf, offset, PGSIZE / 2)
+        offset += readret;
+        readret = readFromSwapFile(p, buf, offset, PGSIZE);
     }
-
 
     // TODO: copy file_pages pointers
 
@@ -344,8 +344,8 @@ fork(void)
 
   acquire(&wait_lock);
   np->parent = p;
-  np->ramPages = p->ramPages
-  np->swapPages = p->swapPages
+  np->ramPages = p->ramPages;
+  np->swapPages = p->swapPages;
   release(&wait_lock);
 
   acquire(&np->lock);

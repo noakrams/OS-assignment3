@@ -116,6 +116,30 @@ exec(char *path, char **argv)
   p->trapframe->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
 
+  struct page_md *pagemd;
+  if(p->pid > 2){
+    for(int i = 0 ; i< MAX_TOTAL_PAGES; i++){
+        pagemd = & p->total_pages[i];
+        pagemd -> stat = UNUSED;
+        pagemd -> va = 0;
+    }
+    p->ramPages = 0;
+    p->swapPages = 0;
+    removeSwapFile(p);
+    createSwapFile(p);
+  }
+
+  int number_of_pages = sz/4096;
+  if(sz%4096 !=0)
+    number_of_pages++;
+  
+  for(int i = 0; i<number_of_pages; i++){
+    pagemd = &p->total_pages[i];
+    pagemd->stat = MEMORY;
+    pagemd->offset = 0;
+    pagemd->va = 4096*i;
+  }
+
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:

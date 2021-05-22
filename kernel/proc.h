@@ -119,6 +119,6 @@ struct proc {
   int ramPages;
   int swapPages;
   struct page_md total_pages [MAX_TOTAL_PAGES]; // All the pages should be here
-  struct page_md* file_pages [MAX_PSYC_PAGES];  // Pointer to the pages in the file
-  struct page_md mem_pages [MAX_PSYC_PAGES];   // Pointer to the pages in the memory
+  //struct page_md* file_pages [MAX_PSYC_PAGES];  // Pointer to the pages in the file
+  //struct page_md mem_pages [MAX_PSYC_PAGES];   // Pointer to the pages in the memory
 };

@@ -69,9 +69,10 @@ usertrap(void)
     // ok
   } else {
     // TODO: check about kalloc thing (passed 1 to walk)
-    uint64 scause = r_scause()
-    uint64 stval = r_stval()
+    uint64 scause = r_scause();
+    uint64 stval = r_stval();
     struct page_md* currPage;
+    struct page_md* availablePage;
     // TODO: maybe PGROUNDDOWN(stval) is not neccessery and stval is fine.
     uint64 va = PGROUNDDOWN(stval);
     pte_t *pte = walk(p->pagetable, (void *)va, 1);
@@ -79,29 +80,39 @@ usertrap(void)
     // If segmentation fault is 13 or 15 and page is in swap file 
     if(p->pid > 2 && (scause == 13 || scause == 15) && PAGEDOUT(PTE_FLAGS(*pte))){
       
-      // Try and find the page with the requested va
-      for(int i = 0 ; i < MAX_PSYC_PAGES ; i++){
-        if (p->total_pages[i].va == (uint64)stval) {
-            currPage = &p->total_pages[i]
+        // Try and find the page with the requested va
+      for(int i = 0 ; i < MAX_TOTAL_PAGES ; i++){
+        if (p->total_pages[i].va == (uint64)stval && p->total_pages[i].stat == FILE) {
+            currPage = &p->total_pages[i];
+            goto found;
         }
       }
+
+      printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+      printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+      p->killed = 1; 
+
+      found:
       
-      // Check if there's not enough space or we didn't find the page with the requested va
-      if ((p->ramPages + p->swapPages >= MAX_TOTAL_PAGES) || !currPage || p->ramPages >= MAX_PSYC_PAGES) {
+        // Check if there's not enough space
+      if ((p->ramPages + p->swapPages == MAX_TOTAL_PAGES)) {
           printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
           printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
           p->killed = 1; // TODO: 
       }
 
-      // TODO: a page needs to be swapped!  --> TASK2
-      // if (this_proc->pages_in_ram + 1 >= MAX_PSYC_PAGES) {
-      //     if(swap_out() == -1)
-      //         return -1;
-      //     lcr3(V2P(this_proc->pgdir));
-      // }
+
+      if (p->ramPages == MAX_PSYC_PAGES){
+        // TODO: a page needs to be swapped!  --> TASK2
+        // if (this_proc->pages_in_ram + 1 >= MAX_PSYC_PAGES) {
+        //     if(swap_out() == -1)
+        //         return -1;
+        //     lcr3(V2P(this_proc->pgdir));
+        // }
+      }
 
       // Read data from swap file to the virtual address of the page
-      if(ret = readFromSwapFile(p, (char*)currPage->va, currPage->offset * PGSIZE, PGSIZE) == -1)
+      if(readFromSwapFile(p, (char*)currPage->va, currPage->offset * PGSIZE, PGSIZE) == -1)
         panic("can't read from swap file");
 
       // refresh TLB
@@ -112,13 +123,12 @@ usertrap(void)
       // *pte |= PTE_V;
 
       // Update process and current page
-      p->file_pages[currPage->offset] = 0;
+      //p->file_pages[currPage->offset] = 0;
       currPage->offset = -1;
-      currPage->isUsed = 1;
+      currPage->stat = MEMORY;
       currPage->last_update_time = ticks;
       p->ramPages++;
       p->swapPages--;
-
     }
 
   }

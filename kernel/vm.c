@@ -5,6 +5,7 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "proc.h"
 
 /*
  * the kernel's page table.
@@ -249,8 +250,10 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
     }
 
     // Add the new allocated pages to our data structure
-    if(add_page((uint64) mem) == 0)
-      return 0;
+    if(p->pagetable == pagetable){
+      if(add_page((uint64) mem) == 0)
+        return 0;
+    }
 
   }
 
@@ -451,7 +454,7 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 int page_md_free(struct page_md* pagemd){
     if(pagemd == 0)
         return -1;
-    if(pagemd->isUsed){
+    if(pagemd->stat == MEMORY){
         pte_t* pte = walk(myproc()->pagetable, (void*)pagemd->va, 0);
         if(pte == 0) 
           panic("pte is 0 in page_md_free");
@@ -459,7 +462,7 @@ int page_md_free(struct page_md* pagemd){
             uint64 pa = PTE2PA(*pte);
             if (pa == 0)
                 panic("page_md_free");
-            pagemd->isUsed = 0;
+            pagemd->stat = UNUSED;
             pagemd->last_update_time = -1;
             pagemd->va = -1;
             //sfence_vma();
@@ -480,10 +483,10 @@ add_page(uint64 mem){
       }
   }
 
-  if(!page_md)
+  if(!pagemd)
     return 0;
   
-  pagemd->isUsed = 1;
+  pagemd->stat = MEMORY;
   pagemd->last_update_time = ticks;
   pagemd->va = mem;
   pagemd->offset = 0;

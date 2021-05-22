@@ -116,11 +116,12 @@ exec(char *path, char **argv)
   p->trapframe->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
 
+  #ifndef NONE
   struct page_md *pagemd;
   if(p->pid > 2){
     for(int i = 0 ; i< MAX_TOTAL_PAGES; i++){
         pagemd = & p->total_pages[i];
-        pagemd -> stat = UNUSED;
+        pagemd -> stat = NONUSED;
         pagemd -> va = 0;
     }
     p->ramPages = 0;
@@ -139,6 +140,7 @@ exec(char *path, char **argv)
     pagemd->offset = 0;
     pagemd->va = 4096*i;
   }
+  #endif
 
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 

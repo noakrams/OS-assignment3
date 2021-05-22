@@ -313,6 +313,7 @@ fork(void)
   //   }
   // }
 
+  #ifndef NONE
   // init and sh don't have swap file
   if(np->pid > 2){
     // TODO: check if we're not holding keys here
@@ -337,8 +338,8 @@ fork(void)
     }
 
     // TODO: copy file_pages pointers
-
   }
+  #endif
 
   release(&np->lock);
 
@@ -395,7 +396,14 @@ exit(int status)
   end_op();
   p->cwd = 0;
 
+  #ifndef NONE
   removeSwapFile(p);
+  struct page_md* currPage;
+  for(int i = 0; i < MAX_TOTAL_PAGES; i++){
+    currPage = &p->total_pages[i];
+    page_md_free(currPage);
+  }
+  #endif
 
   acquire(&wait_lock);
 
@@ -405,11 +413,7 @@ exit(int status)
   // Parent might be sleeping in wait().
   wakeup(p->parent);
 
-  struct page_md* currPage;
-  for(int i = 0; i < MAX_TOTAL_PAGES; i++){
-    currPage = &p->total_pages[i];
-    page_md_free(currPage);
-  }
+
   
   acquire(&p->lock);
 
@@ -698,4 +702,54 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+
+int page_md_free(struct page_md* pagemd){
+    if(pagemd == 0)
+        return -1;
+    if(pagemd->stat == MEMORY){
+        pte_t* pte = walk(myproc()->pagetable, pagemd->va, 0);
+        if(pte == 0) 
+          panic("pte is 0 in page_md_free");
+        if ((*pte & PTE_V) != 0) {
+            uint64 pa = PTE2PA(*pte);
+            if (pa == 0)
+                panic("page_md_free");
+            pagemd->stat = NONUSED;
+            pagemd->last_update_time = -1;
+            pagemd->va = -1;
+            //sfence_vma();
+            kfree((void*)pa);
+            return 1;
+        }
+    }
+    return -1;
+}
+
+void
+add_page(uint64 mem, pagetable_t pagetable){
+  if(myproc()->pagetable == pagetable){
+  struct proc *p = myproc();
+  struct page_md* pagemd;
+  for (int i = 0; i < MAX_TOTAL_PAGES; i++) {
+    pagemd = &p->total_pages[i];
+    if (pagemd->stat == NONUSED) {
+        goto found;
+    }
+  }
+  return;
+
+  found:
+  pagemd->stat = MEMORY;
+  pagemd->last_update_time = ticks;
+  pagemd->va = mem;
+  pagemd->offset = 0;
+  }
+}
+
+int
+is_place_available(int numToAdd){
+  struct proc* p = myproc();
+  return p->pid > 2 && p->ramPages + p->swapPages + numToAdd > MAX_TOTAL_PAGES;
 }

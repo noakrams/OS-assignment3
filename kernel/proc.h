@@ -81,7 +81,7 @@ struct trapframe {
 };
 
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
-enum status {UNUSED, MEMORY, FILE};
+enum status {NONUSED, MEMORY, FILE};
 
 // page meta-data
 struct page_md{

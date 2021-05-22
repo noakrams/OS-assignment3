@@ -68,6 +68,9 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
+
+    #ifndef NONE
+
     // TODO: check about kalloc thing (passed 1 to walk)
     uint64 scause = r_scause();
     uint64 stval = r_stval();
@@ -103,6 +106,7 @@ usertrap(void)
 
 
       if (p->ramPages == MAX_PSYC_PAGES){
+        pageToSwapFile();
         // TODO: a page needs to be swapped!  --> TASK2
         // if (this_proc->pages_in_ram + 1 >= MAX_PSYC_PAGES) {
         //     if(swap_out() == -1)
@@ -131,6 +135,11 @@ usertrap(void)
       p->swapPages--;
     }
 
+    #else
+      printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+      printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+      p->killed = 1;
+    #endif
   }
 
   if(p->killed)
@@ -278,3 +287,28 @@ devintr()
   }
 }
 
+void
+pageToSwapFile(){
+
+  #ifdef NFUA
+
+  #else
+
+  #ifdef LAPA
+
+  #else
+
+  #ifdef SCFIFO
+
+  #else
+
+  #ifdef NONE
+
+  #endif
+  #endif
+  #endif
+  #endif
+
+
+
+}

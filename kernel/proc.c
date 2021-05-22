@@ -308,7 +308,7 @@ fork(void)
   // if(np->pid <= 2){
   //   for(int i = 0; i < MAX_TOTAL_PAGES; i++){
   //     np->total_pages[i]->isUsed = 0;
-  //     np->total_pages[i]->last_update_time = -1;
+  //     np->total_pages[i]->ctime = -1;
   //     np->total_pages[i]->va = -1;
   //   }
   // }
@@ -476,6 +476,22 @@ wait(uint64 addr)
   }
 }
 
+void
+update_AGING(){
+  struct proc *p = myproc ();
+  struct page_md *pagemd;
+  for(int i = 0; i< MAX_TOTAL_PAGES; i++){
+    pagemd = &p->total_pages[i];
+    if(pagemd->stat == MEMORY){
+        pte_t *pte = walk(p->pagetable, pagemd->va, 1);
+        int accessed = *pte & PTE_A;
+        pagemd->counter >>= 1;
+        pagemd->counter &= (accessed<<7);
+        *pte &= ~PTE_A; // clear pte_a
+    }
+  }
+}
+
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
 // Scheduler never returns.  It loops, doing:
@@ -488,7 +504,6 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
-  
   c->proc = 0;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
@@ -506,6 +521,9 @@ scheduler(void)
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
+
+        update_AGING(); //update which pages it accessed,
+
         c->proc = 0;
       }
       release(&p->lock);
@@ -717,7 +735,7 @@ int page_md_free(struct page_md* pagemd){
             if (pa == 0)
                 panic("page_md_free");
             pagemd->stat = NONUSED;
-            pagemd->last_update_time = -1;
+            pagemd->ctime = -1;
             pagemd->va = -1;
             //sfence_vma();
             kfree((void*)pa);
@@ -742,7 +760,7 @@ add_page(uint64 mem, pagetable_t pagetable){
 
   found:
   pagemd->stat = MEMORY;
-  pagemd->last_update_time = ticks;
+  pagemd->ctime = ticks;
   pagemd->va = mem;
   pagemd->offset = 0;
   }

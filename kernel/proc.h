@@ -85,10 +85,10 @@ enum status {NONUSED, MEMORY, FILE};
 
 // page meta-data
 struct page_md{
-  uint64 va;                  // virtual adress of the user page
+  uint64 va;                // virtual adress of the user page
   enum status stat;         // page is used (1) or unused (0)
-  uint offset;                // offset inside swap file
-  uint last_update_time;      // last update time for this page
+  uint offset;              // offset inside swap file
+  uint ctime;               // last update time for this page
 
   // TODO: initialize or reset in termination and creation
   uint counter;

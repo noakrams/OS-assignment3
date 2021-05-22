@@ -89,6 +89,9 @@ struct page_md{
   enum status stat;         // page is used (1) or unused (0)
   uint offset;                // offset inside swap file
   uint last_update_time;      // last update time for this page
+
+  // TODO: initialize or reset in termination and creation
+  uint counter;
 };
 
 // Per-process state

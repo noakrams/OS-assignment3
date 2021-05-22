@@ -17,6 +17,32 @@ void kernelvec();
 extern int devintr();
 
 void
+pageToSwapFile(){
+
+  #ifdef NFUA
+
+  #else
+
+  #ifdef LAPA
+
+  #else
+
+  #ifdef SCFIFO
+
+  #else
+
+  #ifdef NONE
+
+  #endif
+  #endif
+  #endif
+  #endif
+
+
+
+}
+
+void
 trapinit(void)
 {
   initlock(&tickslock, "time");
@@ -75,10 +101,9 @@ usertrap(void)
     uint64 scause = r_scause();
     uint64 stval = r_stval();
     struct page_md* currPage;
-    struct page_md* availablePage;
     // TODO: maybe PGROUNDDOWN(stval) is not neccessery and stval is fine.
     uint64 va = PGROUNDDOWN(stval);
-    pte_t *pte = walk(p->pagetable, (void *)va, 1);
+    pte_t *pte = walk(p->pagetable, va, 1);
 
     // If segmentation fault is 13 or 15 and page is in swap file 
     if(p->pid > 2 && (scause == 13 || scause == 15) && PAGEDOUT(PTE_FLAGS(*pte))){
@@ -287,28 +312,3 @@ devintr()
   }
 }
 
-void
-pageToSwapFile(){
-
-  #ifdef NFUA
-
-  #else
-
-  #ifdef LAPA
-
-  #else
-
-  #ifdef SCFIFO
-
-  #else
-
-  #ifdef NONE
-
-  #endif
-  #endif
-  #endif
-  #endif
-
-
-
-}

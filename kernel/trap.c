@@ -96,7 +96,6 @@ usertrap(void)
   } else {
 
     #ifndef NONE
-
     // TODO: check about kalloc thing (passed 1 to walk)
     uint64 scause = r_scause();
     uint64 stval = r_stval();

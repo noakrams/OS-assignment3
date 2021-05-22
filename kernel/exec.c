@@ -25,10 +25,11 @@ exec(char *path, char **argv)
 
   if((ip = namei(path)) == 0){
     end_op();
+    printf("hereee\n");
     return -1;
   }
   ilock(ip);
-
+  
   // Check ELF header
   if(readi(ip, 0, (uint64)&elf, 0, sizeof(elf)) != sizeof(elf))
     goto bad;

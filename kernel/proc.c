@@ -305,10 +305,75 @@ fork(void)
 
   pid = np->pid;
 
+  // if(np->pid <= 2){
+  //   for(int i = 0; i < MAX_TOTAL_PAGES; i++){
+  //     np->total_pages[i]->isUsed = 0;
+  //     np->total_pages[i]->last_update_time = -1;
+  //     np->total_pages[i]->va = -1;
+  //   }
+  // }
+
+  #ifndef NONE
+
+  if(np->pid <= 2){
+    struct page_md* pagemd;
+    for(int i = 0; i < MAX_TOTAL_PAGES; i++){
+      pagemd = &np->total_pages[i];
+      pagemd->stat = NONUSED;
+      pagemd->offset = 0;
+      pagemd->last_update_time = -1;
+      pagemd->va = -1;
+    }
+  }
+
+  // init and sh don't have swap file
+  else{
+    // can't hold any keys when in function createSwap file
+    
+    release(&np->lock);
+    createSwapFile(np);
+    acquire(&np->lock);
+
+    // Deep copy of pages in file and memory
+    for (i = 0; i < MAX_TOTAL_PAGES; i++) 
+        np->total_pages[i] = p->total_pages[i];
+
+      release(&np->lock);
+      if(p->pid > 2){
+        char buf[PGSIZE / 2];
+        for(int i = 0; i < (MAX_TOTAL_PAGES - 1) * PGSIZE; i += PGSIZE/2){
+          readFromSwapFile(p,buf,i,PGSIZE/2);
+          writeToSwapFile(np,buf,i,PGSIZE/2);
+        }
+      }
+
+      acquire(&np->lock); 
+    
+      
+    // // buf size is PGSIZE/2 because otherwise it's kernel trap (15)
+    // release(&np->lock);
+    // char buf [PGSIZE / 2];
+    // int offset = 0;
+    // int readret = 0;
+    // readret = readFromSwapFile(p, buf, offset, PGSIZE / 2);
+    // while (readret) {
+    //     if (writeToSwapFile(np, buf, offset, readret) == -1)
+    //         panic("fork error: task 2.3 addition");
+    //     offset += readret;
+    //     readret = readFromSwapFile(p, buf, offset, PGSIZE);
+    // }
+    // acquire(&np->lock); 
+
+    // TODO: copy file_pages pointers
+  }
+  #endif
+
   release(&np->lock);
 
   acquire(&wait_lock);
   np->parent = p;
+  np->ramPages = p->ramPages;
+  np->swapPages = p->swapPages;
   release(&wait_lock);
 
   acquire(&np->lock);
@@ -358,6 +423,17 @@ exit(int status)
   end_op();
   p->cwd = 0;
 
+  #ifndef NONE
+  if(p->pid > 2){
+    removeSwapFile(p);
+    // struct page_md* currPage;
+    // for(int i = 0; i < MAX_TOTAL_PAGES; i++){
+    //   currPage = &p->total_pages[i];
+    //   page_md_free(currPage);
+    // }
+  }
+  #endif
+
   acquire(&wait_lock);
 
   // Give any children to init.
@@ -365,6 +441,8 @@ exit(int status)
 
   // Parent might be sleeping in wait().
   wakeup(p->parent);
+
+
   
   acquire(&p->lock);
 
@@ -653,4 +731,57 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+
+int page_md_free(struct page_md* pagemd){
+    if(pagemd == 0)
+        return -1;
+    if(pagemd->stat == MEMORY){
+        pte_t* pte = walk(myproc()->pagetable, pagemd->va, 0);
+        printf("pte: %p\n", pte);
+        if(pte == 0){ 
+           panic("pte is 0 in page_md_free");
+          }
+        // if page is in memory - set it free
+        if ((*pte & PTE_V)) {
+            uint64 pa = PTE2PA(*pte);
+            if (pa == 0)
+                panic("page_md_free");
+            pagemd->stat = NONUSED;
+            pagemd->last_update_time = -1;
+            pagemd->va = -1;
+            //sfence_vma();
+            kfree((void*)pa);
+            return 1;
+        }
+    }
+    return -1;
+}
+
+void
+add_page(uint64 mem, pagetable_t pagetable){
+  if(myproc()->pagetable == pagetable){
+  struct proc *p = myproc();
+  struct page_md* pagemd;
+  for (int i = 0; i < MAX_TOTAL_PAGES; i++) {
+    pagemd = &p->total_pages[i];
+    if (pagemd->stat == NONUSED) {
+        goto found;
+    }
+  }
+  return;
+
+  found:
+  pagemd->stat = MEMORY;
+  pagemd->last_update_time = ticks;
+  pagemd->va = mem;
+  pagemd->offset = 0;
+  }
+}
+
+int
+is_place_available(int numToAdd){
+  struct proc* p = myproc();
+  return p->pid > 2 && p->ramPages + p->swapPages + numToAdd > MAX_TOTAL_PAGES;
 }

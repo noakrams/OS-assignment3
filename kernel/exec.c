@@ -25,10 +25,11 @@ exec(char *path, char **argv)
 
   if((ip = namei(path)) == 0){
     end_op();
+    printf("hereee\n");
     return -1;
   }
   ilock(ip);
-
+  
   // Check ELF header
   if(readi(ip, 0, (uint64)&elf, 0, sizeof(elf)) != sizeof(elf))
     goto bad;
@@ -115,6 +116,32 @@ exec(char *path, char **argv)
   p->trapframe->epc = elf.entry;  // initial program counter = main
   p->trapframe->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
+
+  #ifndef NONE
+  struct page_md *pagemd;
+  if(p->pid > 2){
+    for(int i = 0 ; i< MAX_TOTAL_PAGES; i++){
+        pagemd = & p->total_pages[i];
+        pagemd -> stat = NONUSED;
+        pagemd -> va = 0;
+    }
+    p->ramPages = 0;
+    p->swapPages = 0;
+    removeSwapFile(p);
+    createSwapFile(p);
+  }
+
+  int number_of_pages = sz/4096;
+  if(sz%4096 !=0)
+    number_of_pages++;
+  
+  for(int i = 0; i<number_of_pages; i++){
+    pagemd = &p->total_pages[i];
+    pagemd->stat = MEMORY;
+    pagemd->offset = 0;
+    pagemd->va = 4096*i;
+  }
+  #endif
 
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 

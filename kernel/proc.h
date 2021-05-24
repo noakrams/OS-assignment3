@@ -81,6 +81,18 @@ struct trapframe {
 };
 
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
+enum status {NONUSED, MEMORY, FILE};
+
+// page meta-data
+struct page_md{
+  uint64 va;                  // virtual adress of the user page
+  enum status stat;         // page is used (1) or unused (0)
+  uint offset;                // offset inside swap file
+  uint last_update_time;      // last update time for this page
+
+  // TODO: initialize or reset in termination and creation
+  uint counter;
+};
 
 // Per-process state
 struct proc {
@@ -107,4 +119,9 @@ struct proc {
   char name[16];               // Process name (debugging)
 
   struct file *swapFile;
+  int ramPages;
+  int swapPages;
+  struct page_md total_pages [MAX_TOTAL_PAGES]; // All the pages should be here
+  //struct page_md* file_pages [MAX_PSYC_PAGES];  // Pointer to the pages in the file
+  //struct page_md mem_pages [MAX_PSYC_PAGES];   // Pointer to the pages in the memory
 };

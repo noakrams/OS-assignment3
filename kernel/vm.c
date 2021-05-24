@@ -224,6 +224,16 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
     return oldsz;
 
   oldsz = PGROUNDUP(oldsz);
+  #ifndef NONE
+  // TODO: check if really round up
+  int numToAdd = (PGROUNDUP(newsz) - oldsz) / PGSIZE;
+
+  if (is_place_available(numToAdd))
+        panic("Not enough space!");
+
+  // TODO: add here swap option for task 2
+  #endif
+
   for(a = oldsz; a < newsz; a += PGSIZE){
     mem = kalloc();
     if(mem == 0){
@@ -236,7 +246,14 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
       uvmdealloc(pagetable, a, oldsz);
       return 0;
     }
+
+    #ifndef NONE
+    // Add the new allocated pages to our data structure
+    add_page((uint64) mem, pagetable);
+    #endif
+
   }
+
   return newsz;
 }
 

@@ -11,6 +11,14 @@
 #include "kernel/memlayout.h"
 #include "kernel/riscv.h"
 
+#define NONE 0
+#define NFUA 1
+#define LAPA 2
+
+struct objectTest {
+    int arr[1024];
+};
+
 
 int test_no = 0;
 
@@ -19,7 +27,7 @@ int very_simple(int pid){
         printf("rest...\n");
         sleep(20);
         printf("exit...\n");
-        //exit(0);
+        exit(0);
     }
     if(pid > 0){
         printf("Parent waiting on test %d\n", test_no);
@@ -91,6 +99,36 @@ int test_paging(int pid, int pages){
 }
 
 
+void forkTest(){
+    int pid = 0;
+    pid = fork();
+   
+    if(pid == 0){
+        struct objectTest *t = malloc(4096);
+        t->arr[0] = 24;
+        t->arr[511] = 500;
+        for(int i = 0; i < 10; i++){
+            malloc(4096);
+        }
+
+        printf("SON: \n");
+        printf("%d\n", t->arr[0]);
+        printf("%d\n", t->arr[511]);
+    }
+    if(pid != 0){
+        wait(&pid);
+
+    // if(pid != 0){
+        struct objectTest *t = malloc(4096);
+        sbrk(20*4096);
+        t->arr[0] = 1;
+        printf("FATHER: %d\n", t->arr[0]);
+    }
+   
+    exit(0);
+}
+
+
 
 int main(int argc, char *argv[]){
 
@@ -115,6 +153,10 @@ int main(int argc, char *argv[]){
 
     printf("------- test%d -------\n", test_no);
     test_paging(fork(),13);
+    test_no++;
+
+    printf("------- test%d -------\n", test_no);
+    forkTest();
     test_no++;
 
     // TODO: ADD MORE TESTS!!

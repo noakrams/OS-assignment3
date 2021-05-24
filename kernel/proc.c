@@ -339,7 +339,6 @@ fork(void)
         np->total_pages[i] = p->total_pages[i];
 
       release(&np->lock);
-    //if(p->swapFile != 0){
       if(p->pid > 2){
         char buf[PGSIZE / 2];
         for(int i = 0; i < (MAX_TOTAL_PAGES - 1) * PGSIZE; i += PGSIZE/2){
@@ -348,12 +347,11 @@ fork(void)
         }
       }
 
-      acquire(&np->lock);
-    //}   
+      acquire(&np->lock); 
     
       
-    // buf size is PGSIZE/2 because otherwise it's kernel trap (15)
-
+    // // buf size is PGSIZE/2 because otherwise it's kernel trap (15)
+    // release(&np->lock);
     // char buf [PGSIZE / 2];
     // int offset = 0;
     // int readret = 0;
@@ -364,6 +362,7 @@ fork(void)
     //     offset += readret;
     //     readret = readFromSwapFile(p, buf, offset, PGSIZE);
     // }
+    // acquire(&np->lock); 
 
     // TODO: copy file_pages pointers
   }
@@ -427,11 +426,11 @@ exit(int status)
   #ifndef NONE
   if(p->pid > 2){
     removeSwapFile(p);
-    struct page_md* currPage;
-    for(int i = 0; i < MAX_TOTAL_PAGES; i++){
-      currPage = &p->total_pages[i];
-      page_md_free(currPage);
-    }
+    // struct page_md* currPage;
+    // for(int i = 0; i < MAX_TOTAL_PAGES; i++){
+    //   currPage = &p->total_pages[i];
+    //   page_md_free(currPage);
+    // }
   }
   #endif
 
@@ -740,10 +739,12 @@ int page_md_free(struct page_md* pagemd){
         return -1;
     if(pagemd->stat == MEMORY){
         pte_t* pte = walk(myproc()->pagetable, pagemd->va, 0);
+        printf("pte: %p\n", pte);
         if(pte == 0){ 
            panic("pte is 0 in page_md_free");
           }
-        if ((*pte & PTE_V) != 0) {
+        // if page is in memory - set it free
+        if ((*pte & PTE_V)) {
             uint64 pa = PTE2PA(*pte);
             if (pa == 0)
                 panic("page_md_free");

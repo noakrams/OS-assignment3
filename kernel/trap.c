@@ -16,29 +16,132 @@ void kernelvec();
 
 extern int devintr();
 
-void
-pageToSwapFile(){
+// count the number of bits in a num
+int
+countBits(int num){
+  int count = 0;
+  while(num){
+    count += num & 1;
+    num >>= 1;
+  }
+  return count;
+}
+
+int
+pageToSwapFile(uint offset){
 
   #ifdef NFUA
+
+  struct proc *p = myproc();
+  struct page_md *pagemd;
+
+  // finding the lowest counter
+
+  int min_value= 2147483647; //max value of int
+  int min_page=-1;
+  for(int i = 0; i< MAX_TOTAL_PAGES; i++){
+    pagemd = &p->total_pages[i];
+    if(pagemd->stat == MEMORY){
+      if(pagemd->counter < min_value){
+        min_value = pagemd->counter;
+        min_page = i;
+      }
+    }
+  }
+
+  // move the page to file
+
+  pagemd = &p->total_pages[min_page];
+  pagemd -> counter = 0;
+  pagemd -> stat = FILE;
+  pagemd -> offset = offset;
+  if(writeToSwapFile(p, (char*) pagemd->va, offset, PGSIZE) == 0)
+    return 0;
+
+  return 1;
 
   #else
 
   #ifdef LAPA
 
+  struct proc *p = myproc();
+  struct page_md *pagemd;
+
+  // finding the smallest number of "1" counter
+  
+  int min_number_of_1= 8;     //max number of 1 in int
+  int min_value= 2147483647;  //max value of int
+  int min_page=-1;
+  for(int i = 0; i< MAX_TOTAL_PAGES; i++){
+    pagemd = &p->total_pages[i];
+    if(pagemd->stat == MEMORY){
+      int count = countBits(pagemd->counter);
+      if(count < min_number_of_1){
+        min_number_of_1 = count;
+        min_value = pagemd->counter;
+        min_page = i;
+      }
+      else if (count == min_number_of_1){
+        if(pagemd->counter < min_value){
+          min_value = pagemd->counter;
+          min_page = i;
+        }
+      }
+    }
+  }
+
+    // move the page to file
+
+  pagemd = &p->total_pages[min_page];
+  pagemd -> counter = 0xFFFFFFFF;
+  pagemd -> stat = FILE;
+  pagemd -> offset = offset;
+  if(writeToSwapFile(p, (char*) pagemd->va, offset, PGSIZE) == 0)
+    return 0;
+
+  return 1;
   #else
 
   #ifdef SCFIFO
 
-  #else
+  struct proc *p = myproc();
+  struct page_md *pagemd;
+  int ctime;
+  int place;
+  while(1){
+    ctime = -1;
+    place = -1;
+    for(int i = 0; i< MAX_TOTAL_PAGES; i++){
+      pagemd = &p->total_pages[i];
+      if(pagemd->stat == MEMORY){
+        if (ctime == -1 || pagemd->ctime < ctime){
+          ctime = pagemd->ctime;
+          place = i;
+        }
+      }
+    }
+    pagemd = &p->total_pages[place];
+    pte_t *pte = walk(p->pagetable, pagemd->va, 1);
+    if(*pte & PTE_A){
+      pagemd->ctime = ticks;  //update time
+      *pte &= ~PTE_A;         //clear access flag
+    }
+    else goto found;
+  }
 
-  #ifdef NONE
+  found:
+
+    // move the page to file
+
+  pagemd -> stat = FILE;
+  pagemd -> offset = offset;
+  if(writeToSwapFile(p, (char*) pagemd->va, offset, PGSIZE) == 0)
+    return 0;
+  return 1;
 
   #endif
   #endif
   #endif
-  #endif
-
-
 
 }
 
@@ -130,7 +233,7 @@ usertrap(void)
 
 
       if (p->ramPages == MAX_PSYC_PAGES){
-        pageToSwapFile();
+        pageToSwapFile(currPage->offset);
         // TODO: a page needs to be swapped!  --> TASK2
         // if (this_proc->pages_in_ram + 1 >= MAX_PSYC_PAGES) {
         //     if(swap_out() == -1)
@@ -154,7 +257,7 @@ usertrap(void)
       //p->file_pages[currPage->offset] = 0;
       currPage->offset = -1;
       currPage->stat = MEMORY;
-      currPage->last_update_time = ticks;
+      currPage->ctime = ticks;
       p->ramPages++;
       p->swapPages--;
     }

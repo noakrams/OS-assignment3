@@ -774,8 +774,9 @@ add_page(uint64 mem, pagetable_t pagetable){
   pagemd->ctime = ticks;
   pagemd->va = mem;
   pagemd->offset = 0;
+  pagemd -> counter = 0;
   #ifdef LAPA
-  pagemd->counter = 0xFFFFFFFF;
+  pagemd -> counter = 0xFFFFFFFF;
   #endif
   }
 }
@@ -784,4 +785,9 @@ int
 is_place_available(int numToAdd){
   struct proc* p = myproc();
   return p->pid > 2 && p->ramPages + p->swapPages + numToAdd > MAX_TOTAL_PAGES;
+}
+
+int
+addpage(void){
+  return 1;
 }

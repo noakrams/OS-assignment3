@@ -114,7 +114,7 @@ void            procdump(void);
 int             page_md_free(struct page_md*);
 void             add_page(uint64, pagetable_t);
 int             is_place_available(int numToAdd);
-
+int             addpage(void); //system call
 // swtch.S
 void            swtch(struct context*, struct context*);
 

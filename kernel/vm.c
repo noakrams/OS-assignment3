@@ -228,10 +228,11 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
   // TODO: check if really round up
   int numToAdd = (PGROUNDUP(newsz) - oldsz) / PGSIZE;
 
+  
   if (is_place_available(numToAdd))
         panic("Not enough space!");
 
-  // TODO: add here swap option for task 2
+  swap_out_if_neccessery(oldsz, newsz);
   #endif
 
   for(a = oldsz; a < newsz; a += PGSIZE){

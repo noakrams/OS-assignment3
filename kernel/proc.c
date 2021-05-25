@@ -16,6 +16,7 @@ int nextpid = 1;
 struct spinlock pid_lock;
 
 extern void forkret(void);
+extern int pageToSwapFile(void);
 static void freeproc(struct proc *p);
 
 extern char trampoline[]; // trampoline.S
@@ -331,6 +332,13 @@ fork(void)
     for (i = 0; i < MAX_TOTAL_PAGES; i++) 
         np->total_pages[i] = p->total_pages[i];
 
+    for(int i = 0 ; i < MAX_PSYC_PAGES; i++){
+      if(p->file_pages[i] == 0)
+        np->file_pages[i] = 0;
+      else
+        np->file_pages[i] = p->file_pages[i] - p->file_pages[0] + np->file_pages[0];
+    }
+
       release(&np->lock);
       if(p->pid > 2){
         char buf[PGSIZE / 2];
@@ -403,12 +411,9 @@ exit(int status)
   #ifndef NONE
   if(p->pid > 2){
     removeSwapFile(p);
-    // struct page_md* currPage;
-    // for(int i = 0; i < MAX_TOTAL_PAGES; i++){
-    //   currPage = &p->total_pages[i];
-    //   uvmunmap(currPage)
-    //   page_md_free(currPage);
-    // }
+    for(int i = 0 ; i < MAX_PSYC_PAGES; i++){
+      p->file_pages[i] = 0;
+    }
   }
   #endif
 
@@ -784,4 +789,39 @@ int
 is_place_available(int numToAdd){
   struct proc* p = myproc();
   return p->pid > 2 && p->ramPages + p->swapPages + numToAdd > MAX_TOTAL_PAGES;
+}
+
+
+void
+swap_out_if_neccessery(uint64 oldSize , uint64 newSize){
+  struct proc* p = myproc();
+  int num_to_swap = 0;
+  num_to_swap = 1 + p->ramPages + num_to_swap - MAX_PSYC_PAGES;
+  
+  if(p->pid <= 2 || num_to_swap <= 0)
+    return;
+
+  for(; oldSize < newSize && num_to_swap > 0 ; oldSize += PGSIZE){
+
+    for(int i = 0 ; i < MAX_PSYC_PAGES ; i++){
+        if(p->total_pages[i].stat == FILE){
+            pageToSwapFile();
+            break;
+        }
+    }
+    num_to_swap -= 1;
+
+  }
+}
+
+int
+find_free_offset(){
+    struct proc* p = myproc();
+    for(int i = 0 ; i < MAX_PSYC_PAGES ; i++){
+        if(!p->file_pages[i]){
+            return i;
+            p->file_pages[i] = 1;
+        }
+    }
+    return -1;
 }

@@ -27,8 +27,9 @@ countBits(int num){
   return count;
 }
 
+
 int
-pageToSwapFile(uint offset){
+pageToSwapFile(){
 
   #ifdef NFUA
 
@@ -50,13 +51,20 @@ pageToSwapFile(uint offset){
   }
 
   // move the page to file
+  if(min_page == -1)
+    return 0;
+
+  int swapfile_offset; = find_free_offset();
+  if(swapfile_offset = find_free_offset() < 0)
+    return 0;
+
 
   pagemd = &p->total_pages[min_page];
+  pagemd -> offset = swapfile_offset * PGSIZE;
   pagemd -> counter = 0;
   pagemd -> stat = FILE;
-  pagemd -> offset = offset;
   page_md -> ctime = -1;
-  if(writeToSwapFile(p, (char*) pagemd->va, offset, PGSIZE) == 0)
+  if(writeToSwapFile(p, (char*) pagemd->va, pagemd -> offset, PGSIZE) == 0)
     return 0;
   // TODO: check this below
   pte_t* pteToRemove = walk(p->pagetable, (uint64)pagemd->va, 0);
@@ -101,14 +109,21 @@ pageToSwapFile(uint offset){
     }
   }
 
+  if(min_page == -1)
+    return 0;
+
+  int swapfile_offset; = find_free_offset();
+  if(swapfile_offset = find_free_offset() < 0)
+    return 0;
+
     // move the page to file
 
   pagemd = &p->total_pages[min_page];
   pagemd -> counter = 0xFFFFFFFF;
   pagemd -> stat = FILE;
-  pagemd -> offset = offset;
+  pagemd -> offset = swapfile_offset * PGSIZE;
   page_md -> ctime = -1;
-  if(writeToSwapFile(p, (char*) pagemd->va, offset, PGSIZE) == 0)
+  if(writeToSwapFile(p, (char*) pagemd->va, pagemd -> offset, PGSIZE) == 0)
     return 0;
   // TODO: check this below
   pte_t* pteToRemove = walk(p->pagetable, (uint64)pagemd->va, 0);
@@ -128,6 +143,7 @@ pageToSwapFile(uint offset){
   struct page_md *pagemd;
   int ctime;
   int place;
+  int swapfile_offset;
   while(1){
     ctime = -1;
     place = -1;
@@ -153,12 +169,17 @@ pageToSwapFile(uint offset){
 
   // move the page to file
 
-  pagemd = &p->total_pages[min_page];
+
+
+  if((swapfile_offset = find_free_offset()) < 0)
+    return 0;
+
+  // pagemd = &p->total_pages[place];
   pagemd -> counter = 0;
   pagemd -> stat = FILE;
-  pagemd -> offset = offset;
-  page_md -> ctime = -1;
-  if(writeToSwapFile(p, (char*) pagemd->va, offset, PGSIZE) == 0)
+  pagemd -> offset = swapfile_offset * PGSIZE;
+  pagemd -> ctime = -1;
+  if(writeToSwapFile(p, (char*) pagemd->va, pagemd -> offset, PGSIZE) == 0)
     return 0;
   // TODO: check this below
   pte_t* pteToRemove = walk(p->pagetable, (uint64)pagemd->va, 0);
@@ -266,7 +287,7 @@ usertrap(void)
 
 
       if (p->ramPages == MAX_PSYC_PAGES){
-        pageToSwapFile(currPage->offset);
+        pageToSwapFile();
 
       }
 
@@ -286,6 +307,7 @@ usertrap(void)
       currPage->offset = -1;
       currPage->stat = MEMORY;
       currPage->ctime = ticks;
+      p->file_pages[currPage->offset/PGSIZE] = 0;
       p->ramPages++;
       p->swapPages--;
     }

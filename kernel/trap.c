@@ -137,11 +137,12 @@ pageToSwapFile(uint offset){
   pagemd -> offset = offset;
   if(writeToSwapFile(p, (char*) pagemd->va, offset, PGSIZE) == 0)
     return 0;
-  return 1;
 
   #endif
   #endif
   #endif
+
+  return 1;
 
 }
 

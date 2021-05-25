@@ -11,9 +11,9 @@
 #include "kernel/memlayout.h"
 #include "kernel/riscv.h"
 
-#define NONE 0
-#define NFUA 1
-#define LAPA 2
+// #define NONE 0
+// #define NFUA 1
+// #define LAPA 2
 
 struct objectTest {
     int arr[1024];

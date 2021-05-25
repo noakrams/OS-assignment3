@@ -305,13 +305,6 @@ fork(void)
 
   pid = np->pid;
 
-  // if(np->pid <= 2){
-  //   for(int i = 0; i < MAX_TOTAL_PAGES; i++){
-  //     np->total_pages[i]->isUsed = 0;
-  //     np->total_pages[i]->ctime = -1;
-  //     np->total_pages[i]->va = -1;
-  //   }
-  // }
 
   #ifndef NONE
 
@@ -321,15 +314,15 @@ fork(void)
       pagemd = &np->total_pages[i];
       pagemd->stat = NONUSED;
       pagemd->offset = 0;
-      pagemd->last_update_time = -1;
+      pagemd->ctime = -1;
       pagemd->va = -1;
     }
   }
 
   // init and sh don't have swap file
   else{
+
     // can't hold any keys when in function createSwap file
-    
     release(&np->lock);
     createSwapFile(np);
     acquire(&np->lock);
@@ -348,23 +341,7 @@ fork(void)
       }
 
       acquire(&np->lock); 
-    
-      
-    // // buf size is PGSIZE/2 because otherwise it's kernel trap (15)
-    // release(&np->lock);
-    // char buf [PGSIZE / 2];
-    // int offset = 0;
-    // int readret = 0;
-    // readret = readFromSwapFile(p, buf, offset, PGSIZE / 2);
-    // while (readret) {
-    //     if (writeToSwapFile(np, buf, offset, readret) == -1)
-    //         panic("fork error: task 2.3 addition");
-    //     offset += readret;
-    //     readret = readFromSwapFile(p, buf, offset, PGSIZE);
-    // }
-    // acquire(&np->lock); 
 
-    // TODO: copy file_pages pointers
   }
   #endif
 
@@ -429,6 +406,7 @@ exit(int status)
     // struct page_md* currPage;
     // for(int i = 0; i < MAX_TOTAL_PAGES; i++){
     //   currPage = &p->total_pages[i];
+    //   uvmunmap(currPage)
     //   page_md_free(currPage);
     // }
   }
@@ -515,7 +493,7 @@ update_AGING(){
         pte_t *pte = walk(p->pagetable, pagemd->va, 1);
         int accessed = *pte & PTE_A;
         pagemd->counter >>= 1;
-        pagemd->counter &= (accessed<<7);
+        pagemd->counter |= (accessed<<7);
         *pte &= ~PTE_A; // clear pte_a
     }
   }
@@ -751,7 +729,7 @@ procdump(void)
   }
 }
 
-
+// TODO: maybe delete this function
 int page_md_free(struct page_md* pagemd){
     if(pagemd == 0)
         return -1;
@@ -790,11 +768,15 @@ add_page(uint64 mem, pagetable_t pagetable){
   }
   return;
 
+  // TODO: initialize counter according to the SELECTION
   found:
   pagemd->stat = MEMORY;
   pagemd->ctime = ticks;
   pagemd->va = mem;
   pagemd->offset = 0;
+  #ifdef LAPA
+  pagemd->counter = 0xFFFFFFFF;
+  #endif
   }
 }
 

@@ -55,8 +55,19 @@ pageToSwapFile(uint offset){
   pagemd -> counter = 0;
   pagemd -> stat = FILE;
   pagemd -> offset = offset;
+  page_md -> ctime = -1;
   if(writeToSwapFile(p, (char*) pagemd->va, offset, PGSIZE) == 0)
     return 0;
+  // TODO: check this below
+  pte_t* pteToRemove = walk(p->pagetable, (uint64)pagemd->va, 0);
+
+  *pteToRemove |= PTE_PG; // in disk
+  *pteToRemove &= ~PTE_V; // not valid
+
+  p->swapPages += 1;
+  p->ramPages -= 1;
+  
+  kfree((void*)(PTE2PA(*pteToRemove)));
 
   return 1;
 
@@ -96,10 +107,19 @@ pageToSwapFile(uint offset){
   pagemd -> counter = 0xFFFFFFFF;
   pagemd -> stat = FILE;
   pagemd -> offset = offset;
+  page_md -> ctime = -1;
   if(writeToSwapFile(p, (char*) pagemd->va, offset, PGSIZE) == 0)
     return 0;
+  // TODO: check this below
+  pte_t* pteToRemove = walk(p->pagetable, (uint64)pagemd->va, 0);
 
-  return 1;
+  *pteToRemove |= PTE_PG; // in disk
+  *pteToRemove &= ~PTE_V; // not valid
+
+  p->swapPages += 1;
+  p->ramPages -= 1;
+  
+  kfree((void*)(PTE2PA(*pteToRemove)));
   #else
 
   #ifdef SCFIFO
@@ -131,17 +151,31 @@ pageToSwapFile(uint offset){
 
   found:
 
-    // move the page to file
+  // move the page to file
 
+  pagemd = &p->total_pages[min_page];
+  pagemd -> counter = 0;
   pagemd -> stat = FILE;
   pagemd -> offset = offset;
+  page_md -> ctime = -1;
   if(writeToSwapFile(p, (char*) pagemd->va, offset, PGSIZE) == 0)
     return 0;
-  return 1;
+  // TODO: check this below
+  pte_t* pteToRemove = walk(p->pagetable, (uint64)pagemd->va, 0);
+
+  *pteToRemove |= PTE_PG; // in disk
+  *pteToRemove &= ~PTE_V; // not valid
+
+  p->swapPages += 1;
+  p->ramPages -= 1;
+  
+  kfree((void*)(PTE2PA(*pteToRemove)));
 
   #endif
   #endif
   #endif
+
+  return 1;
 
 }
 
@@ -199,7 +233,6 @@ usertrap(void)
   } else {
 
     #ifndef NONE
-    // TODO: check about kalloc thing (passed 1 to walk)
     uint64 scause = r_scause();
     uint64 stval = r_stval();
     struct page_md* currPage;
@@ -210,7 +243,7 @@ usertrap(void)
     // If segmentation fault is 13 or 15 and page is in swap file 
     if(p->pid > 2 && (scause == 13 || scause == 15) && PAGEDOUT(PTE_FLAGS(*pte))){
       
-        // Try and find the page with the requested va
+      // Try and find the page with the requested va
       for(int i = 0 ; i < MAX_TOTAL_PAGES ; i++){
         if (p->total_pages[i].va == (uint64)stval && p->total_pages[i].stat == FILE) {
             currPage = &p->total_pages[i];
@@ -224,7 +257,7 @@ usertrap(void)
 
       found:
       
-        // Check if there's not enough space
+      // Check if there's not enough space
       if ((p->ramPages + p->swapPages == MAX_TOTAL_PAGES)) {
           printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
           printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
@@ -234,12 +267,7 @@ usertrap(void)
 
       if (p->ramPages == MAX_PSYC_PAGES){
         pageToSwapFile(currPage->offset);
-        // TODO: a page needs to be swapped!  --> TASK2
-        // if (this_proc->pages_in_ram + 1 >= MAX_PSYC_PAGES) {
-        //     if(swap_out() == -1)
-        //         return -1;
-        //     lcr3(V2P(this_proc->pgdir));
-        // }
+
       }
 
       // Read data from swap file to the virtual address of the page
@@ -262,12 +290,25 @@ usertrap(void)
       p->swapPages--;
     }
 
+    else{
+      printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+      printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+      p->killed = 1;
+    }
+
     #else
       printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
       printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
       p->killed = 1;
     #endif
   }
+
+          // TODO: a page needs to be swapped!  --> TASK2
+        // if (this_proc->pages_in_ram + 1 >= MAX_PSYC_PAGES) {
+        //     if(swap_out() == -1)
+        //         return -1;
+        //     lcr3(V2P(this_proc->pgdir));
+        // }
 
   if(p->killed)
     exit(-1);

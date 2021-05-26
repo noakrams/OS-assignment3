@@ -779,8 +779,9 @@ add_page(uint64 mem, pagetable_t pagetable){
   pagemd->ctime = ticks;
   pagemd->va = mem;
   pagemd->offset = 0;
+  pagemd -> counter = 0;
   #ifdef LAPA
-  pagemd->counter = 0xFFFFFFFF;
+  pagemd -> counter = 0xFFFFFFFF;
   #endif
   }
 }
@@ -821,4 +822,10 @@ find_free_offset(){
         }
     }
     return -1;
+}
+
+
+int
+addpage(void){
+  return 1;
 }

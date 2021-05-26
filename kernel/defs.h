@@ -116,8 +116,7 @@ void            add_page(uint64, pagetable_t);
 int             is_place_available(int numToAdd);
 void            swap_out_if_neccessery(uint64 oldSize, uint64 newSize, int numToAdd);
 int             find_free_offset(void);
-
-
+int             addpage(void); //system call
 // swtch.S
 void            swtch(struct context*, struct context*);
 

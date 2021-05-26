@@ -139,6 +139,10 @@ exec(char *path, char **argv)
     pagemd->stat = MEMORY;
     pagemd->offset = 0;
     pagemd->va = 4096*i;
+    pagemd -> counter = 0;
+    #ifdef LAPA
+    pagemd -> counter = 0xFFFFFFFF;
+    #endif
   }
   #endif
 

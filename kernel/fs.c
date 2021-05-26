@@ -491,6 +491,7 @@ writei(struct inode *ip, int user_src, uint64 src, uint off, uint n)
 
   if(off > ip->size || off + n < off)
     return -1;
+    
   if(off + n > MAXFILE*BSIZE)
     return -1;
 
@@ -512,6 +513,7 @@ writei(struct inode *ip, int user_src, uint64 src, uint off, uint n)
   // because the loop above might have called bmap() and added a new
   // block to ip->addrs[].
   iupdate(ip);
+
 
   return tot;
 }

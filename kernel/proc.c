@@ -329,14 +329,12 @@ fork(void)
     acquire(&np->lock);
 
     // Deep copy of pages in file and memory
-    for (i = 0; i < MAX_TOTAL_PAGES; i++) 
+    for (i = 0; i < MAX_TOTAL_PAGES; i++){ 
         np->total_pages[i] = p->total_pages[i];
+      }
 
     for(int i = 0 ; i < MAX_PSYC_PAGES; i++){
-      if(p->file_pages[i] == 0)
-        np->file_pages[i] = 0;
-      else
-        np->file_pages[i] = p->file_pages[i] - p->file_pages[0] + np->file_pages[0];
+      np->file_pages[i] = p->file_pages[i];
     }
 
       release(&np->lock);
@@ -408,13 +406,16 @@ exit(int status)
   end_op();
   p->cwd = 0;
 
-  #ifndef NONE
-  if(p->pid > 2){
-    removeSwapFile(p);
-    for(int i = 0 ; i < MAX_PSYC_PAGES; i++){
-      p->file_pages[i] = 0;
+  #if (SELECTION == SCFIFO || SELECTION == NFUA || SELECTION == LAPA)
+    if(p->pid > 2){
+      removeSwapFile(p);
+      for(int i = 0 ; i < MAX_PSYC_PAGES; i++){
+        p->file_pages[i] = 0;
+      }
     }
-  }
+  
+    p->ramPages = 0;
+    p->swapPages = 0;
   #endif
 
   acquire(&wait_lock);
@@ -696,6 +697,7 @@ either_copyout(int user_dst, uint64 dst, void *src, uint64 len)
 int
 either_copyin(void *dst, int user_src, uint64 src, uint64 len)
 {
+
   struct proc *p = myproc();
   if(user_src){
     return copyin(p->pagetable, dst, src, len);
@@ -740,7 +742,6 @@ int page_md_free(struct page_md* pagemd){
         return -1;
     if(pagemd->stat == MEMORY){
         pte_t* pte = walk(myproc()->pagetable, pagemd->va, 0);
-        printf("pte: %p\n", pte);
         if(pte == 0){ 
            panic("pte is 0 in page_md_free");
           }
@@ -761,8 +762,9 @@ int page_md_free(struct page_md* pagemd){
 }
 
 void
-add_page(uint64 mem, pagetable_t pagetable){
-  if(myproc()->pagetable == pagetable){
+add_page(uint64 mem){
+
+  
   struct proc *p = myproc();
   struct page_md* pagemd;
   for (int i = 0; i < MAX_TOTAL_PAGES; i++) {
@@ -771,7 +773,11 @@ add_page(uint64 mem, pagetable_t pagetable){
         goto found;
     }
   }
-  return;
+
+  printf("p->ramPages = %d\n" , p->ramPages);
+  printf("p->swapPages = %d\n" , p->swapPages);
+
+  //panic("Can't find NONUSED page in add_page\n");
 
   // TODO: initialize counter according to the SELECTION
   found:
@@ -783,7 +789,7 @@ add_page(uint64 mem, pagetable_t pagetable){
   #ifdef LAPA
   pagemd -> counter = 0xFFFFFFFF;
   #endif
-  }
+  
 }
 
 int
@@ -795,13 +801,10 @@ is_place_available(int numToAdd){
 
 void
 swap_out_if_neccessery(uint64 oldSize , uint64 newSize, int numToAdd){
-  printf("swap_out_if_neccessery\n");
   struct proc* p = myproc();
   int num_to_swap = 0;
 
   num_to_swap = 1 + p->ramPages + numToAdd - MAX_PSYC_PAGES;
-
-  printf("num_to_swap = %d\n" , num_to_swap);
   
   if(p->pid <= 2 || num_to_swap <= 0)
     return;

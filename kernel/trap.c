@@ -66,11 +66,9 @@ pageToSwapFile(){
   pagemd -> counter = 0;
   pagemd -> stat = FILE;
   pagemd -> ctime = -1;
-  printf("before write to swap\n");
-  if(writeToSwapFile(p, (char*) pagemd->va, pagemd -> offset, PGSIZE / 2) == 0)
+  if(writeToSwapFile(p, (char*) pagemd->va, pagemd -> offset, PGSIZE) == 0)
     return 0;
   // TODO: check this below
-  printf("after write to swap\n");
   pte_t* pteToRemove = walk(p->pagetable, (uint64)pagemd->va, 0);
 
   *pteToRemove |= PTE_PG; // in disk
@@ -79,7 +77,7 @@ pageToSwapFile(){
   p->swapPages += 1;
   p->ramPages -= 1;
   
-  kfree((void*)(PTE2PA(*pteToRemove)));
+  //kfree((void*)(PTE2PA(*pteToRemove)));
 
   return 1;
 
@@ -138,7 +136,7 @@ pageToSwapFile(){
   p->swapPages += 1;
   p->ramPages -= 1;
   
-  kfree((void*)(PTE2PA(*pteToRemove)));
+  //kfree((void*)(PTE2PA(*pteToRemove)));
   #else
 
   #ifdef SCFIFO
@@ -256,7 +254,6 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
-    printf("here1\n");
 
     #ifndef NONE
     uint64 scause = r_scause();

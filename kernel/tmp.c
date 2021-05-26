@@ -1,17 +1,7 @@
-#include "types.h"
-#include "param.h"
-#include "memlayout.h"
-#include "riscv.h"
-#include "spinlock.h"
-#include "proc.h"
-#include "defs.h"
-#include "elf.h"
-
-static int loadseg(pde_t *pgdir, uint64 addr, struct inode *ip, uint offset, uint sz);
-
 int
 exec(char *path, char **argv)
 {
+  printf("exec\n");
   char *s, *last;
   int i, off;
   uint64 argc, sz = 0, sp, ustack[MAXARG+1], stackbase;
@@ -20,31 +10,66 @@ exec(char *path, char **argv)
   struct proghdr ph;
   pagetable_t pagetable = 0, oldpagetable;
   struct proc *p = myproc();
-  
 
+#if (SELECTION == SCFIFO || SELECTION == NFUA || SELECTION == LAPA)
 
-  #if(SELECTION == NFUA || SELECTION == LAPA || SELECTION == SCFIFO)
-    struct page_md pages_backup[MAX_TOTAL_PAGES];
-    int file_pages_backup[MAX_PSYC_PAGES];
-    int ramPages_backup = 0;
-    int swapPages_backup = 0;
+  // back up the data
+  struct page backup_RAM[MAX_PSYC_PAGES];
+  struct page backup_swap[MAX_PSYC_PAGES];
+  int backup_numOfMemory = 0;
+  int backup_numOfPageFaults = 0;
+  int backup_numOfPagedOut = 0;
+  int backup_numOfSwapping = 0;
+  int backup_indexSCFIFO = 0;
 
-    if(p->pid > 2){
-      ramPages_backup = p->ramPages;
-      swapPages_backup = p->swapPages;
+  if(p->pid > 2){
+    // back up counters
+    backup_numOfMemory = p->numOfMemoryPages;
+    backup_numOfPagedOut = p->numOfPagedOut;
+    backup_numOfPageFaults = p->numOfPageFaults;
+    backup_numOfSwapping = p->numOfSwapping;
+    backup_indexSCFIFO = p->indexSCFIFO;
 
-      p->ramPages = 0;
-      p->swapPages = 0;
+    for(int i = 0; i<MAX_PSYC_PAGES; i++){
+      // back up the ram array
+      backup_RAM[i].vaddr = p->ramArray[i].vaddr;
+      backup_RAM[i].isUnavailable = p->ramArray[i].isUnavailable;
+      backup_RAM[i].pagetable = p->ramArray[i].pagetable;
+      backup_RAM[i].age = p->ramArray[i].age;
 
-      for(int i = 0 ; i < MAX_TOTAL_PAGES ; i++)
-        pages_backup[i] = p->total_pages[i];
-      
-
-      for(int i = 0 ; i < MAX_PSYC_PAGES; i++)
-        file_pages_backup[i] = p->file_pages[i];
+      // back up the swap array
+      backup_swap[i].vaddr = p->swapArray[i].vaddr;
+      backup_swap[i].age = p->swapArray[i].age;
+      backup_swap[i].isUnavailable = p->swapArray[i].isUnavailable;
+      backup_swap[i].pagetable = p->swapArray[i].pagetable;
     }
 
+    // zero the counters
+    p->numOfMemoryPages = 0;
+    p->numOfPagedOut = 0;
+    p->numOfPageFaults = 0;
+    p->numOfSwapping = 0;
+    p->indexSCFIFO = 0;
+
+    // zero the data
+    for(int i = 0; i<MAX_PSYC_PAGES; i++){
+      // zero the ram array
+      p->ramArray[i].vaddr = 0xffffffff;
+      p->ramArray[i].isUnavailable = 0;
+      p->ramArray[i].age = 0;
+      p->ramArray[i].pagetable = 0;
+
+      // zero the swap array
+      p->swapArray[i].vaddr = 0xffffffff;
+      p->swapArray[i].isUnavailable = 0;
+      p->swapArray[i].age = 0;
+      p->swapArray[i].pagetable = 0;
+    }
+  }
   #endif
+
+
+
 
   begin_op();
 
@@ -53,7 +78,7 @@ exec(char *path, char **argv)
     return -1;
   }
   ilock(ip);
-  
+
   // Check ELF header
   if(readi(ip, 0, (uint64)&elf, 0, sizeof(elf)) != sizeof(elf))
     goto bad;
@@ -132,22 +157,22 @@ exec(char *path, char **argv)
     if(*s == '/')
       last = s+1;
   safestrcpy(p->name, last, sizeof(p->name));
+   
+  if(p->pid>2){
+    printf("change is here\n");
+    removeSwapFile(p);
+    createSwapFile(p);
+  }  
 
-  #if(SELECTION == NFUA || SELECTION == LAPA || SELECTION == SCFIFO)
-    struct page_md *pagemd;
-    if(p->pid > 2){
-      for(int i = 0 ; i< MAX_TOTAL_PAGES; i++){
-          pagemd = & p->total_pages[i];
-          pagemd -> stat = NONUSED;
-          pagemd -> va = -1;
-      }
-      p->ramPages = 0;
-      p->swapPages = 0;
-      removeSwapFile(p);
-      createSwapFile(p);
+  for(int i = 0; i<MAX_PSYC_PAGES; i++){
+    if(p->ramArray[i].isUnavailable == 1){ // check all the unavaile spaces
+      p->ramArray[i].pagetable = pagetable;
     }
-  #endif
-    
+    if(p->swapArray[i].isUnavailable == 1){ // check all the unavaile spaces
+      p->swapArray[i].pagetable = pagetable;
+    }
+  }
+
   // Commit to the user image.
   oldpagetable = p->pagetable;
   p->pagetable = pagetable;
@@ -155,24 +180,7 @@ exec(char *path, char **argv)
   p->trapframe->epc = elf.entry;  // initial program counter = main
   p->trapframe->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
-
-
-  // int number_of_pages = sz/4096;
-  // if(sz%4096 !=0)
-  //   number_of_pages++;
-  
-  // for(int i = 0; i<number_of_pages; i++){
-  //   pagemd = &p->total_pages[i];
-  //   pagemd->stat = MEMORY;
-  //   pagemd->offset = 0;
-  //   pagemd->va = 4096*i;
-  //   pagemd -> counter = 0;
-  //   #ifdef LAPA
-  //   pagemd -> counter = 0xFFFFFFFF;
-  //   #endif
-  // }
-
-
+  printf("I leave exec\n");
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:
@@ -181,49 +189,30 @@ exec(char *path, char **argv)
 
   #if (SELECTION == SCFIFO || SELECTION == NFUA || SELECTION == LAPA)
     if(p->pid > 2){
-      p->ramPages = ramPages_backup;
-      p->swapPages = swapPages_backup;
+      p->numOfMemoryPages = backup_numOfMemory;
+      p->numOfPagedOut = backup_numOfPagedOut;
+      p->numOfPageFaults = backup_numOfPageFaults;
+      p->numOfSwapping = backup_numOfSwapping;
+      p->indexSCFIFO = backup_indexSCFIFO;
 
-      for(int i = 0 ; i < MAX_TOTAL_PAGES ; i++)
-        p->total_pages[i] = pages_backup[i]; 
-      
+      for(int i = 0; i<MAX_PSYC_PAGES; i++){
+        p->ramArray[i].vaddr = backup_RAM[i].vaddr;
+        p->ramArray[i].isUnavailable = backup_RAM[i].isUnavailable;
+        p->ramArray[i].age = backup_RAM[i].age;
+        p->ramArray[i].pagetable = backup_RAM[i].pagetable;
 
-      for(int i = 0 ; i < MAX_PSYC_PAGES; i++)
-        p->file_pages[i] = file_pages_backup[i];
+        p->swapArray[i].vaddr = backup_swap[i].vaddr;
+        p->swapArray[i].isUnavailable = backup_swap[i].isUnavailable;
+        p->swapArray[i].age = backup_swap[i].age;
+        p->swapArray[i].pagetable = backup_swap[i].pagetable;
+      }
     }
   #endif
+
 
   if(ip){
     iunlockput(ip);
     end_op();
   }
   return -1;
-}
-
-// Load a program segment into pagetable at virtual address va.
-// va must be page-aligned
-// and the pages from va to va+sz must already be mapped.
-// Returns 0 on success, -1 on failure.
-static int
-loadseg(pagetable_t pagetable, uint64 va, struct inode *ip, uint offset, uint sz)
-{
-  uint i, n;
-  uint64 pa;
-
-  if((va % PGSIZE) != 0)
-    panic("loadseg: va must be page aligned");
-
-  for(i = 0; i < sz; i += PGSIZE){
-    pa = walkaddr(pagetable, va + i);
-    if(pa == 0)
-      panic("loadseg: address should exist");
-    if(sz - i < PGSIZE)
-      n = sz - i;
-    else
-      n = PGSIZE;
-    if(readi(ip, 0, (uint64)pa, offset+i, n) != n)
-      return -1;
-  }
-  
-  return 0;
 }

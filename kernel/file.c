@@ -239,9 +239,12 @@ kfilewrite(struct file *f, uint64 addr, int n)
         n1 = max;
 
       begin_op();
+      
       ilock(f->ip);
+      
       if ((r = writei(f->ip, 0, addr + i, f->off, n1)) > 0)
         f->off += r;
+
       iunlock(f->ip);
       end_op();
 

@@ -250,7 +250,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 
     #ifndef NONE
     // Add the new allocated pages to our data structure
-    add_page((uint64) mem, pagetable);
+    add_page((uint64) mem);
     #endif
 
   }
@@ -265,8 +265,32 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 uint64
 uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 {
+  // pte_t *pte;
+  // uint a;
+  // struct page_md* pagemd;
+
   if(newsz >= oldsz)
     return oldsz;
+
+  // a = PGROUNDUP(newsz);
+
+  // for (; a < oldsz; a += PGSIZE) {
+  //     pte = walkpgdir(pagetable, (uint64)a, 0);
+
+  //     //TODO: check if page is in swap file
+
+  //     if (!pte) 
+  //         a += (1024 - 1) * PGSIZE; // 1024 pte in a pagetable
+
+  //     reset_page_md((void*) a);
+  //     page_md_free((void*) a);
+  //     kfree((void*)(PTE2PA(*pteToRemove)))
+  //     // If it's paged out no need to free it, but pointer should be removed
+  //     // If it's present, now it's not :)
+  //     if(pte && (*pte & PTE_PG || *pte & PTE_P)){
+  //         *pte = 0;
+  //     }
+  // }
 
   if(PGROUNDUP(newsz) < PGROUNDUP(oldsz)){
     int npages = (PGROUNDUP(oldsz) - PGROUNDUP(newsz)) / PGSIZE;

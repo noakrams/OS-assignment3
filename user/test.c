@@ -104,6 +104,7 @@ void forkTest(){
     pid = fork();
    
     if(pid == 0){
+        
         struct objectTest *t = malloc(4096);
         t->arr[0] = 24;
         t->arr[511] = 500;

@@ -227,12 +227,11 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
   #ifndef NONE
   // TODO: check if really round up
   int numToAdd = (PGROUNDUP(newsz) - oldsz) / PGSIZE;
-
   
   if (is_place_available(numToAdd))
         panic("Not enough space!");
 
-  swap_out_if_neccessery(oldsz, newsz, numToAdd);
+  
   #endif
 
   for(a = oldsz; a < newsz; a += PGSIZE){
@@ -250,6 +249,9 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 
     #ifndef NONE
     // Add the new allocated pages to our data structure
+    //oldsz, newsz, numToAdd
+    swap_out_if_neccessery();
+    
     add_page((uint64) mem);
     #endif
 

@@ -108,9 +108,10 @@ void forkTest(){
         struct objectTest *t = malloc(4096);
         t->arr[0] = 24;
         t->arr[511] = 500;
-        for(int i = 0; i < 10; i++){
-            malloc(4096);
-        }
+        // for(int i = 0; i < 10; i++){
+        //     malloc(4096);
+        // }
+        sbrk(10*4096);
 
         printf("SON: \n");
         printf("%d\n", t->arr[0]);
@@ -119,7 +120,7 @@ void forkTest(){
     if(pid != 0){
         wait(&pid);
         struct objectTest *t = malloc(4096);
-        sbrk(20*4096);
+        //sbrk(20*4096);
         t->arr[0] = 1;
         printf("FATHER: %d\n", t->arr[0]);
     }

@@ -74,7 +74,6 @@ pageToSwapFile(){
   *pteToRemove |= PTE_PG; // in disk
   *pteToRemove &= ~PTE_V; // not valid
 
-  printf("hereee\n");
   p->swapPages += 1;
   p->ramPages -= 1;
   

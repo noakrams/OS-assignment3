@@ -415,6 +415,7 @@ exit(int status)
     }
   
   #endif
+  printf("p->ramPages = %d     ,   p->swapPages = %d\n" , p->ramPages, p->swapPages);
   p->ramPages = 0;
   p->swapPages = 0;
 
@@ -803,21 +804,21 @@ is_place_available(int numToAdd){
   return p->pid > 2 && p->ramPages + p->swapPages + numToAdd > MAX_TOTAL_PAGES;
 }
 
-
+//uint64 oldSize , uint64 newSize, int numToAdd
 void
-swap_out_if_neccessery(uint64 oldSize , uint64 newSize, int numToAdd){
+swap_out_if_neccessery(void){
   struct proc* p = myproc();
-  int num_to_swap = 0;
+  // int num_to_swap = 0;
 
-  num_to_swap = 1 + p->ramPages + numToAdd - MAX_PSYC_PAGES;
+  // num_to_swap = 1 + p->ramPages + numToAdd - MAX_PSYC_PAGES;
   
-  if(p->pid <= 2 || num_to_swap <= 0)
+  if(p->pid <= 2 || p->ramPages < MAX_PSYC_PAGES)
     return;
 
-  for(; oldSize < newSize && num_to_swap > 0 ; oldSize += PGSIZE){
+ // for(; oldSize < newSize && num_to_swap > 0 ; oldSize += PGSIZE){
       pageToSwapFile();
-      num_to_swap -= 1;
-  }
+  //     num_to_swap -= 1;
+  // }
 }
 
 int

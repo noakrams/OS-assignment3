@@ -414,9 +414,9 @@ exit(int status)
       }
     }
   
-    p->ramPages = 0;
-    p->swapPages = 0;
   #endif
+  p->ramPages = 0;
+  p->swapPages = 0;
 
   acquire(&wait_lock);
 
@@ -785,7 +785,8 @@ add_page(uint64 mem){
   pagemd->ctime = ticks;
   pagemd->va = mem;
   pagemd->offset = 0;
-  pagemd -> counter = 0;
+  pagemd->counter = 0;
+  p->ramPages += 1;
   #ifdef LAPA
   pagemd -> counter = 0xFFFFFFFF;
   #endif
@@ -795,6 +796,10 @@ add_page(uint64 mem){
 int
 is_place_available(int numToAdd){
   struct proc* p = myproc();
+  printf("p->pid = %d\n" , p->pid);
+  printf("p->ramPages = %d\n" , p->ramPages);
+  printf("p->swapPages = %d\n" , p->swapPages);
+  printf("numToAdd = %d\n" , numToAdd);
   return p->pid > 2 && p->ramPages + p->swapPages + numToAdd > MAX_TOTAL_PAGES;
 }
 
@@ -831,4 +836,29 @@ find_free_offset(){
 int
 addpage(void){
   return 1;
+}
+
+struct page_md* 
+find_page_by_va(uint64 va){
+  struct proc* p = myproc();
+  for(int i = 0 ; i < MAX_TOTAL_PAGES ; i++){
+    if (p->total_pages[i].va == va) {
+        return &p->total_pages[i];
+      }
+    }
+  return 0;
+}
+
+void
+reset_page(struct page_md* page){
+  struct proc* p = myproc();
+  if (page->stat == MEMORY) {
+      p->ramPages--;
+  }
+  if (page->stat == FILE) {
+      p->swapPages--;
+  }
+  page->stat = NONUSED;
+  page->va = -1;
+  page->ctime = -1;
 }

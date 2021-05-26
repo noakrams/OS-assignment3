@@ -118,8 +118,6 @@ void forkTest(){
     }
     if(pid != 0){
         wait(&pid);
-
-    // if(pid != 0){
         struct objectTest *t = malloc(4096);
         sbrk(20*4096);
         t->arr[0] = 1;

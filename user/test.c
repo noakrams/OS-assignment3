@@ -136,25 +136,25 @@ int main(int argc, char *argv[]){
     printf("--------- START TESTING! ---------\n");
 
 
-    printf("------- test%d -------\n", test_no);
-    very_simple(fork());
-    test_no++;
+    // printf("------- test%d -------\n", test_no);
+    // very_simple(fork());
+    // test_no++;
 
-    printf("------- test%d -------\n", test_no);
-    simple(fork());
-    test_no++;
+    // printf("------- test%d -------\n", test_no);
+    // simple(fork());
+    // test_no++;
 
-    printf("------- test%d -------\n", test_no);
-    test_paging(fork(),2);
-    test_no++;
+    // printf("------- test%d -------\n", test_no);
+    // test_paging(fork(),2);
+    // test_no++;
 
-    printf("------- test%d -------\n", test_no);
-    test_paging(fork(),6);
-    test_no++;
+    // printf("------- test%d -------\n", test_no);
+    // test_paging(fork(),6);
+    // test_no++;
 
-    printf("------- test%d -------\n", test_no);
-    test_paging(fork(),13);
-    test_no++;
+    // printf("------- test%d -------\n", test_no);
+    // test_paging(fork(),13);
+    // test_no++;
 
     printf("------- test%d -------\n", test_no);
     forkTest();

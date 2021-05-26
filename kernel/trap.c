@@ -33,8 +33,10 @@ pageToSwapFile(){
 
   #ifdef NFUA
 
+  printf("NFUA\n");
   struct proc *p = myproc();
   struct page_md *pagemd;
+  int swapfile_offset;
 
   // finding the lowest counter
 
@@ -54,8 +56,8 @@ pageToSwapFile(){
   if(min_page == -1)
     return 0;
 
-  int swapfile_offset; = find_free_offset();
-  if(swapfile_offset = find_free_offset() < 0)
+   
+  if((swapfile_offset = find_free_offset()) < 0)
     return 0;
 
 
@@ -63,10 +65,12 @@ pageToSwapFile(){
   pagemd -> offset = swapfile_offset * PGSIZE;
   pagemd -> counter = 0;
   pagemd -> stat = FILE;
-  page_md -> ctime = -1;
-  if(writeToSwapFile(p, (char*) pagemd->va, pagemd -> offset, PGSIZE) == 0)
+  pagemd -> ctime = -1;
+  printf("before write to swap\n");
+  if(writeToSwapFile(p, (char*) pagemd->va, pagemd -> offset, PGSIZE / 2) == 0)
     return 0;
   // TODO: check this below
+  printf("after write to swap\n");
   pte_t* pteToRemove = walk(p->pagetable, (uint64)pagemd->va, 0);
 
   *pteToRemove |= PTE_PG; // in disk
@@ -252,6 +256,7 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
+    printf("here1\n");
 
     #ifndef NONE
     uint64 scause = r_scause();

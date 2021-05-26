@@ -793,24 +793,21 @@ is_place_available(int numToAdd){
 
 
 void
-swap_out_if_neccessery(uint64 oldSize , uint64 newSize){
+swap_out_if_neccessery(uint64 oldSize , uint64 newSize, int numToAdd){
+  printf("swap_out_if_neccessery\n");
   struct proc* p = myproc();
   int num_to_swap = 0;
-  num_to_swap = 1 + p->ramPages + num_to_swap - MAX_PSYC_PAGES;
+
+  num_to_swap = 1 + p->ramPages + numToAdd - MAX_PSYC_PAGES;
+
+  printf("num_to_swap = %d\n" , num_to_swap);
   
   if(p->pid <= 2 || num_to_swap <= 0)
     return;
 
   for(; oldSize < newSize && num_to_swap > 0 ; oldSize += PGSIZE){
-
-    for(int i = 0 ; i < MAX_PSYC_PAGES ; i++){
-        if(p->total_pages[i].stat == FILE){
-            pageToSwapFile();
-            break;
-        }
-    }
-    num_to_swap -= 1;
-
+      pageToSwapFile();
+      num_to_swap -= 1;
   }
 }
 

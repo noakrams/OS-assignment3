@@ -25,7 +25,6 @@ exec(char *path, char **argv)
 
   if((ip = namei(path)) == 0){
     end_op();
-    printf("hereee\n");
     return -1;
   }
   ilock(ip);

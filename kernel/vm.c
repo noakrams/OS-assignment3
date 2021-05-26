@@ -232,7 +232,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
   if (is_place_available(numToAdd))
         panic("Not enough space!");
 
-  swap_out_if_neccessery(oldsz, newsz);
+  swap_out_if_neccessery(oldsz, newsz, numToAdd);
   #endif
 
   for(a = oldsz; a < newsz; a += PGSIZE){

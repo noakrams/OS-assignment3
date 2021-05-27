@@ -52,7 +52,6 @@ pageToSwapFile(){
     }
   }
 
-  // move the page to file
   if(min_page == -1)
     return 0;
 
@@ -66,19 +65,23 @@ pageToSwapFile(){
   pagemd -> counter = 0;
   pagemd -> stat = FILE;
   pagemd -> ctime = -1;
+  printf("(char*) pagemd->va = %p\n" , (char*) pagemd->va);
+  printf("pagemd -> offset = %d\n" , pagemd -> offset);
   if(writeToSwapFile(p, (char*) pagemd->va, pagemd -> offset, PGSIZE) == 0)
     return 0;
+  printf("after write\n");
   // TODO: check this below
   pte_t* pteToRemove = walk(p->pagetable, (uint64)pagemd->va, 0);
-
+  
   *pteToRemove |= PTE_PG; // in disk
   *pteToRemove &= ~PTE_V; // not valid
 
   p->swapPages += 1;
   p->ramPages -= 1;
+  printf("pa = %x\n" , (void*)EXTRACT_PA(*pteToRemove));
   
   //kfree((void*)(PTE2PA(*pteToRemove)));
-
+  kfree((void*)EXTRACT_PA(*pteToRemove));
   return 1;
 
   #else
@@ -277,31 +280,21 @@ usertrap(void)
       printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
       p->killed = 1; 
 
-      found:
-      
-      // Check if there's not enough space
-      if ((p->ramPages + p->swapPages == MAX_TOTAL_PAGES)) {
-          printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
-          printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-          p->killed = 1; // TODO: 
-      }
-
-
-      if (p->ramPages == MAX_PSYC_PAGES){
-        pageToSwapFile();
-
-      }
+      found:      
 
       // Read data from swap file to the virtual address of the page
       if(readFromSwapFile(p, (char*)currPage->va, currPage->offset * PGSIZE, PGSIZE) == -1)
         panic("can't read from swap file");
 
+      if (p->ramPages == MAX_PSYC_PAGES){
+        p->file_pages[currPage->offset] = 0;
+        pageToSwapFile();
+      }
+
       // refresh TLB
       // sfence_vma();
       // Turn off swap bit
       *pte &= ~PTE_PG;
-      // Turn on valid --> already done in walk...
-      // *pte |= PTE_V;
 
       // Update process and current page
       //p->file_pages[currPage->offset] = 0;

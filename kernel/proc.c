@@ -497,7 +497,7 @@ update_AGING(){
   for(int i = 0; i< MAX_TOTAL_PAGES; i++){
     pagemd = &p->total_pages[i];
     if(pagemd->stat == MEMORY){
-        pte_t *pte = walk(p->pagetable, pagemd->va, 1);
+        pte_t *pte = walk(p->pagetable, pagemd->va, 0);
         int accessed = *pte & PTE_A;
         pagemd->counter >>= 1;
         pagemd->counter |= (accessed<<7);
@@ -788,6 +788,7 @@ add_page(uint64 mem){
   pagemd->offset = 0;
   pagemd->counter = 0;
   p->ramPages += 1;
+  
   #ifdef LAPA
   pagemd -> counter = 0xFFFFFFFF;
   #endif
@@ -807,6 +808,7 @@ is_place_available(int numToAdd){
 //uint64 oldSize , uint64 newSize, int numToAdd
 void
 swap_out_if_neccessery(void){
+  
   struct proc* p = myproc();
   // int num_to_swap = 0;
 
@@ -816,6 +818,7 @@ swap_out_if_neccessery(void){
     return;
 
  // for(; oldSize < newSize && num_to_swap > 0 ; oldSize += PGSIZE){
+      printf("p->ramPages = %d , swapping\n" , p->ramPages);
       pageToSwapFile();
   //     num_to_swap -= 1;
   // }

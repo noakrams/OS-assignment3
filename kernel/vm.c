@@ -219,6 +219,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 {
   char *mem;
   uint64 a;
+  int i = 0;
 
   if(newsz < oldsz)
     return oldsz;
@@ -250,9 +251,10 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
     #ifndef NONE
     // Add the new allocated pages to our data structure
     //oldsz, newsz, numToAdd
+    printf("interation %d\n" , i);
     swap_out_if_neccessery();
-    
-    add_page((uint64) mem);
+    i++;
+    add_page((uint64) a);
     #endif
 
   }

@@ -341,7 +341,7 @@ sfence_vma()
 
 #define PTE_FLAGS(pte) ((pte) & 0x3FF)
 
-#define EXTRACT_PA(pte) ((PTE2PA(pte) >> 12) & 0XFFFFFFFFFFF)
+#define EXTRACT_PA(pte) ((pte) >> 10)
 
 // extract the three 9-bit page table indices from a virtual address.
 #define PXMASK          0x1FF // 9 bits

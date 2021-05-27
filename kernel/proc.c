@@ -357,6 +357,9 @@ fork(void)
   np->parent = p;
   np->ramPages = p->ramPages;
   np->swapPages = p->swapPages;
+  for(int i = 0; i< MAX_TOTAL_PAGES; i++){
+    np->total_pages[i] = p->total_pages[i];
+  }
   release(&wait_lock);
 
   acquire(&np->lock);
@@ -418,6 +421,13 @@ exit(int status)
   printf("p->ramPages = %d     ,   p->swapPages = %d\n" , p->ramPages, p->swapPages);
   p->ramPages = 0;
   p->swapPages = 0;
+  for(int i = 0; i< MAX_TOTAL_PAGES; i++){
+    p->total_pages[i].stat = NONUSED;
+    p->total_pages[i].va = 0;
+    p->total_pages[i].offset = 0;
+    p->total_pages[i].ctime = 0;
+    p->total_pages[i].counter = 0;
+  }
 
   acquire(&wait_lock);
 
@@ -499,9 +509,13 @@ update_AGING(){
     if(pagemd->stat == MEMORY){
         pte_t *pte = walk(p->pagetable, pagemd->va, 0);
         int accessed = *pte & PTE_A;
+        accessed<<=1;
+        // printf("inside AGING, pid %d, page %d, old counter %d, accessed bit %d",p->pid, i, pagemd->counter, accessed);
         pagemd->counter >>= 1;
-        pagemd->counter |= (accessed<<7);
+        //pagemd->counter &= ~accessed; //reset the bit of the accessed
+        pagemd->counter |= accessed;  //change the last bit of the counter if need to
         *pte &= ~PTE_A; // clear pte_a
+        //printf(", new counter %d\n", pagemd->counter);
     }
   }
 }
@@ -776,7 +790,7 @@ add_page(uint64 mem){
 
   printf("p->ramPages = %d\n" , p->ramPages);
   printf("p->swapPages = %d\n" , p->swapPages);
-
+  printf("add page for pid %d, mem %d\n" , p->pid, mem); 
   //panic("Can't find NONUSED page in add_page\n");
 
   // TODO: initialize counter according to the SELECTION
@@ -787,7 +801,8 @@ add_page(uint64 mem){
   pagemd->offset = 0;
   pagemd->counter = 0;
   p->ramPages += 1;
-  
+  //printf("inside add pages, rampages %d\n", p->ramPages);
+
   #ifdef LAPA
   pagemd -> counter = 0xFFFFFFFF;
   #endif
@@ -806,19 +821,19 @@ is_place_available(int numToAdd){
 
 //uint64 oldSize , uint64 newSize, int numToAdd
 void
-swap_out_if_neccessery(void){
+swap_out_if_neccessery(){
   
   struct proc* p = myproc();
-  // int num_to_swap = 0;
+  //int num_to_swap;
 
-  // num_to_swap = 1 + p->ramPages + numToAdd - MAX_PSYC_PAGES;
+  //num_to_swap = 1 + p->ramPages + numToAdd - MAX_PSYC_PAGES;
   // printf("in swap_out_if_neccessery. p->swapPages = %d\n" , p->swapPages);
   if(p->pid <= 2 || p->ramPages < MAX_PSYC_PAGES)
     return;
 
  // for(; oldSize < newSize && num_to_swap > 0 ; oldSize += PGSIZE){
-      printf("p->ramPages = %d , swapping\n" , p->ramPages);
-      pageToSwapFile();
+  printf("p->ramPages = %d , swapping\n" , p->ramPages);
+  pageToSwapFile();
   //     num_to_swap -= 1;
   // }
 }
@@ -829,6 +844,18 @@ find_free_offset(){
     for(int i = 0 ; i < MAX_PSYC_PAGES ; i++){
         if(!p->file_pages[i])
             return i;
+    }
+    return -1;
+}
+
+int
+find_free_offset_mem(){
+    struct proc* p = myproc();
+    for(int i = 0 ; i < MAX_PSYC_PAGES ; i++){
+        if(!p->mem_pages[i]){
+            p->mem_pages[i] = 1;
+            return i;
+        }
     }
     return -1;
 }

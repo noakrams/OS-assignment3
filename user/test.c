@@ -128,6 +128,11 @@ void forkTest(){
     exit(0);
 }
 
+void
+simpleswapTest (){
+    sbrk(20*4096);
+}
+
 
 
 
@@ -156,8 +161,12 @@ int main(int argc, char *argv[]){
     // test_paging(fork(),13);
     // test_no++;
 
+    // printf("------- test%d -------\n", test_no);
+    // forkTest();
+    // test_no++;
+
     printf("------- test%d -------\n", test_no);
-    forkTest();
+    simpleswapTest();
     test_no++;
 
     // TODO: ADD MORE TESTS!!

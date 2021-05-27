@@ -91,7 +91,7 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
       if(!alloc || (pagetable = (pde_t*)kalloc()) == 0)
         return 0;
       memset(pagetable, 0, PGSIZE);
-      *pte = PA2PTE(pagetable) | PTE_V;
+      *pte = *pte | PA2PTE(pagetable) | PTE_V;
     }
   }
   return &pagetable[PX(0, va)];
@@ -147,7 +147,7 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
       return -1;
     if(*pte & PTE_V)
       panic("remap");
-    *pte = PA2PTE(pa) | perm | PTE_V;
+    *pte = *pte | PA2PTE(pa) | perm | PTE_V;
     if(a == last)
       break;
     a += PGSIZE;
@@ -219,7 +219,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 {
   char *mem;
   uint64 a;
-  int i = 0;
+  //int i = 0;
 
   if(newsz < oldsz)
     return oldsz;
@@ -250,14 +250,12 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
     #ifndef NONE
     // Add the new allocated pages to our data structure
     //oldsz, newsz, numToAdd
-    printf("interation %d\n" , i);
     swap_out_if_neccessery();
-    i++;
-    add_page((uint64) a);
+    //i++;
+    add_page((uint64) (find_free_offset_mem()*4096));
     #endif
 
   }
-
   return newsz;
 }
 

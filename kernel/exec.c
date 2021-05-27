@@ -132,10 +132,19 @@ exec(char *path, char **argv)
     if(*s == '/')
       last = s+1;
   safestrcpy(p->name, last, sizeof(p->name));
+    
+  // Commit to the user image.
+  oldpagetable = p->pagetable;
+  p->pagetable = pagetable;
+  p->sz = sz;
+  p->trapframe->epc = elf.entry;  // initial program counter = main
+  p->trapframe->sp = sp; // initial stack pointer
+  proc_freepagetable(oldpagetable, oldsz);
 
   #if(SELECTION == NFUA || SELECTION == LAPA || SELECTION == SCFIFO)
     struct page_md *pagemd;
     if(p->pid > 2){
+      
       for(int i = 0 ; i< MAX_TOTAL_PAGES; i++){
           pagemd = & p->total_pages[i];
           pagemd -> stat = NONUSED;
@@ -147,16 +156,7 @@ exec(char *path, char **argv)
       createSwapFile(p);
     }
   #endif
-    
-  // Commit to the user image.
-  oldpagetable = p->pagetable;
-  p->pagetable = pagetable;
-  p->sz = sz;
-  p->trapframe->epc = elf.entry;  // initial program counter = main
-  p->trapframe->sp = sp; // initial stack pointer
-  proc_freepagetable(oldpagetable, oldsz);
-
-
+  
   // int number_of_pages = sz/4096;
   // if(sz%4096 !=0)
   //   number_of_pages++;

@@ -114,8 +114,9 @@ void            procdump(void);
 int             page_md_free(struct page_md*);
 void            add_page(uint64);
 int             is_place_available(int numToAdd);
-void            swap_out_if_neccessery();
+void            swap_out_if_neccessery(void);
 int             find_free_offset(void);
+int             find_free_offset_mem(void);
 int             addpage(void); //system call
 struct page_md* find_page_by_va(uint64 va);
 void            reset_page(struct page_md*);

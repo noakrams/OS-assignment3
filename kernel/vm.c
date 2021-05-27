@@ -247,7 +247,6 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
       uvmdealloc(pagetable, a, oldsz);
       return 0;
     }
-
     #ifndef NONE
     // Add the new allocated pages to our data structure
     //oldsz, newsz, numToAdd
@@ -411,13 +410,15 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 int
 copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 {
+  printf("hereeeeeeeee\n");
   uint64 n, va0, pa0;
-
   while(len > 0){
     va0 = PGROUNDDOWN(srcva);
     pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
+    if(pa0 == 0){
+      printf("herreee\n");
       return -1;
+      }
     n = PGSIZE - (srcva - va0);
     if(n > len)
       n = len;

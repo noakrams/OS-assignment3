@@ -698,7 +698,6 @@ either_copyout(int user_dst, uint64 dst, void *src, uint64 len)
 int
 either_copyin(void *dst, int user_src, uint64 src, uint64 len)
 {
-
   struct proc *p = myproc();
   if(user_src){
     return copyin(p->pagetable, dst, src, len);

@@ -65,10 +65,14 @@ pageToSwapFile(){
   pagemd -> counter = 0;
   pagemd -> stat = FILE;
   pagemd -> ctime = -1;
+  uint64 pa = walkaddr(p->pagetable, pagemd->va);
+  printf("pa = %x\n" , pa);
   printf("(char*) pagemd->va = %p\n" , (char*) pagemd->va);
   printf("pagemd -> offset = %d\n" , pagemd -> offset);
-  if(writeToSwapFile(p, (char*) pagemd->va, pagemd -> offset, PGSIZE) == 0)
+  if(writeToSwapFile(p, (char*) pagemd->va, pagemd -> offset, PGSIZE) == 0){
+    panic("return 0 from writeToSwapFile\n");
     return 0;
+    }
   printf("after write\n");
   // TODO: check this below
   pte_t* pteToRemove = walk(p->pagetable, (uint64)pagemd->va, 0);

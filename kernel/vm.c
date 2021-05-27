@@ -410,7 +410,6 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 int
 copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 {
-  printf("hereeeeeeeee\n");
   uint64 n, va0, pa0;
   while(len > 0){
     va0 = PGROUNDDOWN(srcva);

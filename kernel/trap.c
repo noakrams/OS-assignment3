@@ -59,33 +59,34 @@ pageToSwapFile(){
   if((swapfile_offset = find_free_offset()) < 0)
     return 0;
 
-
+min_page += 1;
   pagemd = &p->total_pages[min_page];
+  printf("pagemd = %p\n", pagemd);
+  printf("min_page = %d\n" , min_page);
   pagemd -> offset = swapfile_offset * PGSIZE;
   pagemd -> counter = 0;
   pagemd -> stat = FILE;
   pagemd -> ctime = -1;
-  uint64 pa = walkaddr(p->pagetable, pagemd->va);
-  printf("pa = %x\n" , pa);
+  pte_t* pteToRemove = walk(p->pagetable, (uint64)pagemd->va, 0);
   printf("(char*) pagemd->va = %p\n" , (char*) pagemd->va);
+  printf("pa = %p\n" , (char*)(PTE2PA(*pteToRemove)));
   printf("pagemd -> offset = %d\n" , pagemd -> offset);
-  if(writeToSwapFile(p, (char*) pagemd->va, pagemd -> offset, PGSIZE) == 0){
+  if(writeToSwapFile(p, (char*)(PTE2PA(*pteToRemove)), pagemd -> offset, PGSIZE) == 0){
     panic("return 0 from writeToSwapFile\n");
     return 0;
-    }
-  printf("after write\n");
-  // TODO: check this below
-  pte_t* pteToRemove = walk(p->pagetable, (uint64)pagemd->va, 0);
+  }
+
+  p->file_pages[swapfile_offset] = 1;
+  
   
   *pteToRemove |= PTE_PG; // in disk
   *pteToRemove &= ~PTE_V; // not valid
 
   p->swapPages += 1;
   p->ramPages -= 1;
-  printf("pa = %x\n" , (void*)EXTRACT_PA(*pteToRemove));
   
-  //kfree((void*)(PTE2PA(*pteToRemove)));
-  kfree((void*)EXTRACT_PA(*pteToRemove));
+  kfree((void*)(PTE2PA(*pteToRemove)));
+
   return 1;
 
   #else

@@ -812,7 +812,7 @@ swap_out_if_neccessery(void){
   // int num_to_swap = 0;
 
   // num_to_swap = 1 + p->ramPages + numToAdd - MAX_PSYC_PAGES;
-  
+  // printf("in swap_out_if_neccessery. p->swapPages = %d\n" , p->swapPages);
   if(p->pid <= 2 || p->ramPages < MAX_PSYC_PAGES)
     return;
 
@@ -827,10 +827,8 @@ int
 find_free_offset(){
     struct proc* p = myproc();
     for(int i = 0 ; i < MAX_PSYC_PAGES ; i++){
-        if(!p->file_pages[i]){
+        if(!p->file_pages[i])
             return i;
-            p->file_pages[i] = 1;
-        }
     }
     return -1;
 }

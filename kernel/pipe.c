@@ -76,7 +76,6 @@ pipeclose(struct pipe *pi, int writable)
 int
 pipewrite(struct pipe *pi, uint64 addr, int n)
 {
-  printf("hereee\n");
   int i = 0;
   struct proc *pr = myproc();
 

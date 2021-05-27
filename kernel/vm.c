@@ -219,7 +219,6 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 {
   char *mem;
   uint64 a;
-  //int i = 0;
 
   if(newsz < oldsz)
     return oldsz;
@@ -234,7 +233,6 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 
   
   #endif
-
   for(a = oldsz; a < newsz; a += PGSIZE){
     mem = kalloc();
     if(mem == 0){
@@ -252,7 +250,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
     //oldsz, newsz, numToAdd
     swap_out_if_neccessery();
     //i++;
-    add_page((uint64) (find_free_offset_mem()*4096));
+    add_page((uint64) a);
     #endif
 
   }
@@ -266,12 +264,14 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 uint64
 uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 {
-  pte_t *pte;
-  uint a;
-  struct page_md* pageToRemove;
 
   if(newsz >= oldsz)
     return oldsz;
+
+  #ifndef NONE
+  pte_t *pte;
+  uint a;
+  struct page_md* pageToRemove;
 
   a = PGROUNDUP(newsz);
 
@@ -290,6 +290,7 @@ uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
       page_md_free(pageToRemove);
   }
 
+  #endif
   if(PGROUNDUP(newsz) < PGROUNDUP(oldsz)){
     int npages = (PGROUNDUP(oldsz) - PGROUNDUP(newsz)) / PGSIZE;
     uvmunmap(pagetable, PGROUNDUP(newsz), npages, 1);

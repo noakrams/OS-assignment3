@@ -74,12 +74,10 @@ pageToSwapFile(){
   // printf("(char*) pagemd->va = %p\n" , (char*) pagemd->va);
   // printf("pa = %p\n" , (char*)(PTE2PA(*pteToRemove)));
   // printf("pagemd -> offset = %d\n" , pagemd -> offset);
-  printf("before write, address: %d\n", PTE2PA(*pteToRemove));
   if(writeToSwapFile(p, (char*)(PTE2PA(*pteToRemove)), pagemd -> offset, PGSIZE) == 0){
     panic("return 0 from writeToSwapFile\n");
     return 0;
   }
-  printf("after write\n");
 
   p->file_pages[swapfile_offset] = 1;
   
@@ -302,8 +300,8 @@ usertrap(void)
 
       // refresh TLB
       // sfence_vma();
-      // Turn off swap bit
-      *pte &= ~PTE_PG;
+      *pte &= ~PTE_PG; // Turn off swap bit
+      *pte |= PTE_V; // Turn on valid bit
 
       // Update process and current page
       //p->file_pages[currPage->offset] = 0;

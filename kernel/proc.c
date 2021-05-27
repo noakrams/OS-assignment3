@@ -273,6 +273,7 @@ growproc(int n)
 int
 fork(void)
 {
+  printf("inside fork\n");
   int i, pid;
   struct proc *np;
   struct proc *p = myproc();
@@ -305,7 +306,6 @@ fork(void)
   safestrcpy(np->name, p->name, sizeof(p->name));
 
   pid = np->pid;
-
 
   #ifndef NONE
 
@@ -366,6 +366,7 @@ fork(void)
   np->state = RUNNABLE;
   release(&np->lock);
 
+  printf("end fork\n");
   return pid;
 }
 
@@ -390,6 +391,7 @@ reparent(struct proc *p)
 void
 exit(int status)
 {
+
   struct proc *p = myproc();
 
   if(p == initproc)
@@ -409,7 +411,7 @@ exit(int status)
   end_op();
   p->cwd = 0;
 
-  #if (SELECTION == SCFIFO || SELECTION == NFUA || SELECTION == LAPA)
+  #ifndef NONE
     if(p->pid > 2){
       removeSwapFile(p);
       for(int i = 0 ; i < MAX_PSYC_PAGES; i++){
@@ -418,15 +420,18 @@ exit(int status)
     }
   
   #endif
-  printf("p->ramPages = %d     ,   p->swapPages = %d\n" , p->ramPages, p->swapPages);
   p->ramPages = 0;
   p->swapPages = 0;
+  struct page_md *pagemd;
   for(int i = 0; i< MAX_TOTAL_PAGES; i++){
-    p->total_pages[i].stat = NONUSED;
-    p->total_pages[i].va = 0;
-    p->total_pages[i].offset = 0;
-    p->total_pages[i].ctime = 0;
-    p->total_pages[i].counter = 0;
+    pagemd = &p->total_pages[i];
+    page_md_free(pagemd);
+    pagemd->counter = 0;
+    pagemd->ctime=0;
+    pagemd->offset=0;
+    pagemd->va=0;
+    pagemd->stat=UNUSED;
+
   }
 
   acquire(&wait_lock);
@@ -445,7 +450,6 @@ exit(int status)
   p->state = ZOMBIE;
 
   release(&wait_lock);
-
   // Jump into the scheduler, never to return.
   sched();
   panic("zombie exit");
@@ -509,7 +513,7 @@ update_AGING(){
     if(pagemd->stat == MEMORY){
         pte_t *pte = walk(p->pagetable, pagemd->va, 0);
         int accessed = *pte & PTE_A;
-        accessed<<=1;
+        accessed<<=1; 
         // printf("inside AGING, pid %d, page %d, old counter %d, accessed bit %d",p->pid, i, pagemd->counter, accessed);
         pagemd->counter >>= 1;
         //pagemd->counter &= ~accessed; //reset the bit of the accessed
@@ -549,9 +553,9 @@ scheduler(void)
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
-
+        #ifndef NONE
         update_AGING(); //update which pages it accessed,
-
+        #endif
         c->proc = 0;
       }
       release(&p->lock);
@@ -780,6 +784,8 @@ add_page(uint64 mem){
 
   
   struct proc *p = myproc();
+  if(p->pid<=2)
+    return;
   struct page_md* pagemd;
   for (int i = 0; i < MAX_TOTAL_PAGES; i++) {
     pagemd = &p->total_pages[i];
@@ -788,13 +794,13 @@ add_page(uint64 mem){
     }
   }
 
-  printf("p->ramPages = %d\n" , p->ramPages);
-  printf("p->swapPages = %d\n" , p->swapPages);
-  printf("add page for pid %d, mem %d\n" , p->pid, mem); 
+  // printf("p->ramPages = %d\n" , p->ramPages);
+  // printf("p->swapPages = %d\n" , p->swapPages);
   //panic("Can't find NONUSED page in add_page\n");
 
   // TODO: initialize counter according to the SELECTION
   found:
+
   pagemd->stat = MEMORY;
   pagemd->ctime = ticks;
   pagemd->va = mem;
@@ -812,10 +818,6 @@ add_page(uint64 mem){
 int
 is_place_available(int numToAdd){
   struct proc* p = myproc();
-  printf("p->pid = %d\n" , p->pid);
-  printf("p->ramPages = %d\n" , p->ramPages);
-  printf("p->swapPages = %d\n" , p->swapPages);
-  printf("numToAdd = %d\n" , numToAdd);
   return p->pid > 2 && p->ramPages + p->swapPages + numToAdd > MAX_TOTAL_PAGES;
 }
 
@@ -889,4 +891,5 @@ reset_page(struct page_md* page){
   page->stat = NONUSED;
   page->va = -1;
   page->ctime = -1;
+  page->offset = -1;
 }

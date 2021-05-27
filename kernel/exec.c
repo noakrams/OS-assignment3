@@ -23,28 +23,28 @@ exec(char *path, char **argv)
   
 
 
-  #if(SELECTION == NFUA || SELECTION == LAPA || SELECTION == SCFIFO)
-    struct page_md pages_backup[MAX_TOTAL_PAGES];
-    int file_pages_backup[MAX_PSYC_PAGES];
-    int ramPages_backup = 0;
-    int swapPages_backup = 0;
+  // #if(SELECTION == NFUA || SELECTION == LAPA || SELECTION == SCFIFO)
+  //   struct page_md pages_backup[MAX_TOTAL_PAGES];
+  //   int file_pages_backup[MAX_PSYC_PAGES];
+  //   int ramPages_backup = 0;
+  //   int swapPages_backup = 0;
 
-    if(p->pid > 2){
-      ramPages_backup = p->ramPages;
-      swapPages_backup = p->swapPages;
+  //   if(p->pid > 2){
+  //     ramPages_backup = p->ramPages;
+  //     swapPages_backup = p->swapPages;
 
-      p->ramPages = 0;
-      p->swapPages = 0;
+  //     p->ramPages = 0;
+  //     p->swapPages = 0;
 
-      for(int i = 0 ; i < MAX_TOTAL_PAGES ; i++)
-        pages_backup[i] = p->total_pages[i];
+  //     for(int i = 0 ; i < MAX_TOTAL_PAGES ; i++)
+  //       pages_backup[i] = p->total_pages[i];
       
 
-      for(int i = 0 ; i < MAX_PSYC_PAGES; i++)
-        file_pages_backup[i] = p->file_pages[i];
-    }
+  //     for(int i = 0 ; i < MAX_PSYC_PAGES; i++)
+  //       file_pages_backup[i] = p->file_pages[i];
+  //   }
 
-  #endif
+  // #endif
 
   begin_op();
 
@@ -141,7 +141,7 @@ exec(char *path, char **argv)
   p->trapframe->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
 
-  #if(SELECTION == NFUA || SELECTION == LAPA || SELECTION == SCFIFO)
+  #ifndef NONE
     struct page_md *pagemd;
     if(p->pid > 2){
       
@@ -156,7 +156,7 @@ exec(char *path, char **argv)
       createSwapFile(p);
     }
   #endif
-  
+
   // int number_of_pages = sz/4096;
   // if(sz%4096 !=0)
   //   number_of_pages++;
@@ -179,19 +179,19 @@ exec(char *path, char **argv)
   if(pagetable)
     proc_freepagetable(pagetable, sz);
 
-  #if (SELECTION == SCFIFO || SELECTION == NFUA || SELECTION == LAPA)
-    if(p->pid > 2){
-      p->ramPages = ramPages_backup;
-      p->swapPages = swapPages_backup;
+  // #if (SELECTION == SCFIFO || SELECTION == NFUA || SELECTION == LAPA)
+  //   if(p->pid > 2){
+  //     p->ramPages = ramPages_backup;
+  //     p->swapPages = swapPages_backup;
 
-      for(int i = 0 ; i < MAX_TOTAL_PAGES ; i++)
-        p->total_pages[i] = pages_backup[i]; 
+  //     for(int i = 0 ; i < MAX_TOTAL_PAGES ; i++)
+  //       p->total_pages[i] = pages_backup[i]; 
       
 
-      for(int i = 0 ; i < MAX_PSYC_PAGES; i++)
-        p->file_pages[i] = file_pages_backup[i];
-    }
-  #endif
+  //     for(int i = 0 ; i < MAX_PSYC_PAGES; i++)
+  //       p->file_pages[i] = file_pages_backup[i];
+  //   }
+  // #endif
 
   if(ip){
     iunlockput(ip);

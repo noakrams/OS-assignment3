@@ -156,9 +156,9 @@ int main(int argc, char *argv[]){
     // test_paging(fork(),13);
     // test_no++;
 
-    printf("------- test%d -------\n", test_no);
-    forkTest();
-    test_no++;
+    // printf("------- test%d -------\n", test_no);
+    // forkTest();
+    // test_no++;
 
     // TODO: ADD MORE TESTS!!
 

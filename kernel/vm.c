@@ -219,7 +219,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 {
   char *mem;
   uint64 a;
-  int i = 0;
+  
 
   if(newsz < oldsz)
     return oldsz;
@@ -250,7 +250,6 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
     #ifndef NONE
     // Add the new allocated pages to our data structure
     //oldsz, newsz, numToAdd
-    printf("interation %d\n" , i);
     swap_out_if_neccessery();
     i++;
     add_page((uint64) a);
@@ -276,20 +275,20 @@ uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
     return oldsz;
 
   a = PGROUNDUP(newsz);
+  
+  if(pidBiggerThan2()){
+    for (; a < oldsz; a += PGSIZE) {
+        pte = walk(pagetable, (uint64)a, 0);
 
-  for (; a < oldsz; a += PGSIZE) {
-      pte = walk(pagetable, (uint64)a, 0);
+        if (!pte) 
+            a += (1024 - 1) * PGSIZE; // 1024 pte in a pagetable
 
-      //TODO: check if page is in swap file
-
-      if (!pte) 
-          a += (1024 - 1) * PGSIZE; // 1024 pte in a pagetable
-
-      pageToRemove = find_page_by_va((uint64)a);
-      // reset page
-      reset_page(pageToRemove);
-      // free 
-      page_md_free(pageToRemove);
+        pageToRemove = find_page_by_va((uint64)a);
+        // reset page
+        reset_page(pageToRemove);
+        // free 
+        page_md_free(pageToRemove);
+    }
   }
 
   if(PGROUNDUP(newsz) < PGROUNDUP(oldsz)){

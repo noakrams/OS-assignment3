@@ -20,16 +20,15 @@ exec(char *path, char **argv)
   struct proghdr ph;
   pagetable_t pagetable = 0, oldpagetable;
   struct proc *p = myproc();
+  struct page_md pages_backup[MAX_TOTAL_PAGES];
+  int file_pages_backup[MAX_PSYC_PAGES];
+  int ramPages_backup = 0;
+  int swapPages_backup = 0;
   
 
-
   #if(SELECTION == NFUA || SELECTION == LAPA || SELECTION == SCFIFO)
-    struct page_md pages_backup[MAX_TOTAL_PAGES];
-    int file_pages_backup[MAX_PSYC_PAGES];
-    int ramPages_backup = 0;
-    int swapPages_backup = 0;
-
     if(p->pid > 2){
+
       ramPages_backup = p->ramPages;
       swapPages_backup = p->swapPages;
 
@@ -136,10 +135,12 @@ exec(char *path, char **argv)
   #if(SELECTION == NFUA || SELECTION == LAPA || SELECTION == SCFIFO)
     struct page_md *pagemd;
     if(p->pid > 2){
-      for(int i = 0 ; i< MAX_TOTAL_PAGES; i++){
+      for(int i = 0 ; i < MAX_TOTAL_PAGES; i++){
           pagemd = & p->total_pages[i];
           pagemd -> stat = NONUSED;
           pagemd -> va = -1;
+          pagemd -> offset = -1;
+          pagemd -> counter = 0;
       }
       p->ramPages = 0;
       p->swapPages = 0;

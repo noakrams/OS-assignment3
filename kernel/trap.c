@@ -59,7 +59,7 @@ pageToSwapFile(){
   if((swapfile_offset = find_free_offset()) < 0)
     return 0;
 
-min_page += 1;
+
   pagemd = &p->total_pages[min_page];
   printf("pagemd = %p\n", pagemd);
   printf("min_page = %d\n" , min_page);

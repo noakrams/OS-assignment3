@@ -119,6 +119,7 @@ int             find_free_offset(void);
 int             addpage(void); //system call
 struct page_md* find_page_by_va(uint64 va);
 void            reset_page(struct page_md*);
+int            pidBiggerThan2(void);
 
 
 // swtch.S

@@ -762,10 +762,9 @@ int page_md_free(struct page_md* pagemd){
 }
 
 void
-add_page(uint64 mem){
-
-  
+add_page(uint64 va){
   struct proc *p = myproc();
+  if(p->pid <= 2) return;
   struct page_md* pagemd;
   for (int i = 0; i < MAX_TOTAL_PAGES; i++) {
     pagemd = &p->total_pages[i];
@@ -774,16 +773,13 @@ add_page(uint64 mem){
     }
   }
 
-  printf("p->ramPages = %d\n" , p->ramPages);
-  printf("p->swapPages = %d\n" , p->swapPages);
-
-  //panic("Can't find NONUSED page in add_page\n");
+  panic("Can't find NONUSED page in add_page\n");
 
   // TODO: initialize counter according to the SELECTION
   found:
   pagemd->stat = MEMORY;
   pagemd->ctime = ticks;
-  pagemd->va = mem;
+  pagemd->va = va;
   pagemd->offset = 0;
   pagemd->counter = 0;
   p->ramPages += 1;
@@ -791,7 +787,6 @@ add_page(uint64 mem){
   #ifdef LAPA
   pagemd -> counter = 0xFFFFFFFF;
   #endif
-  
 }
 
 int
@@ -808,7 +803,10 @@ is_place_available(int numToAdd){
 void
 swap_out_if_neccessery(void){
   
+  
   struct proc* p = myproc();
+
+  if(p->pid <= 2) return;
   // int num_to_swap = 0;
 
   // num_to_swap = 1 + p->ramPages + numToAdd - MAX_PSYC_PAGES;
@@ -862,4 +860,10 @@ reset_page(struct page_md* page){
   page->stat = NONUSED;
   page->va = -1;
   page->ctime = -1;
+}
+
+int
+pidBiggerThan2(void){
+  struct proc* p = myproc();
+  return p->pid > 2;
 }

@@ -267,7 +267,6 @@ void pageFaultTest(){
     printf("arr[13] %p\n",arr[13]);
     arr[13][0] = 1; // page fault
     printf("finish test!!!!\n");
-   
 }
 
 
@@ -280,9 +279,9 @@ int main(int argc, char *argv[]){
     // printf("--------- START TESTING! ---------\n");
 
 
-    printf("------- test%d -------\n", test_no);
-    very_simple(fork());
-    test_no++;
+    // printf("------- test%d -------\n", test_no);
+    // very_simple(fork());
+    // test_no++;
 
     // printf("------- test%d -------\n", test_no);
     // simple(fork());
@@ -296,9 +295,9 @@ int main(int argc, char *argv[]){
     // test_paging(fork(),6);
     // test_no++;
 
-    // printf("------- test%d -------\n", test_no);
-    // test_paging(fork(),13);
-    // test_no++;
+    printf("------- test%d -------\n", test_no);
+    test_paging(fork(),13);
+    test_no++;
 
     // printf("------- test%d -------\n", test_no);
     // forkTest();
@@ -308,9 +307,9 @@ int main(int argc, char *argv[]){
     // forkTest2();
     // test_no++;
 
-    // printf("------- test%d -------\n", test_no);
-    // pageFaultTest();
-    // test_no++;
+    printf("------- test%d -------\n", test_no);
+    pageFaultTest();
+    test_no++;
     // printf("------- test%d -------\n", test_no);
     // simpleswapTest();
     // test_no++;

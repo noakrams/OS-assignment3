@@ -154,8 +154,9 @@ freeproc(struct proc *p)
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
-  if(p->pagetable)
+  if(p->pagetable){
     proc_freepagetable(p->pagetable, p->sz);
+  }
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
@@ -209,6 +210,7 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, TRAPFRAME, 1, 0);
   uvmfree(pagetable, sz);
+
 }
 
 // a user program that calls exec("/init")
@@ -277,7 +279,6 @@ fork(void)
   int i, pid;
   struct proc *np;
   struct proc *p = myproc();
-  printf("inside fork    , p->pid = %d   ,  p->ramPages = %d\n" , p->pid, p->ramPages);
 
   // Allocate process.
   if((np = allocproc()) == 0){
@@ -842,7 +843,7 @@ swap_out_if_neccessery(){
     return;
 
  // for(; oldSize < newSize && num_to_swap > 0 ; oldSize += PGSIZE){
-  printf("p->ramPages = %d , swapping\n" , p->ramPages);
+  //printf("p->ramPages = %d , swapping\n" , p->ramPages);
   pageToSwapFile();
   //     num_to_swap -= 1;
   // }
@@ -854,18 +855,6 @@ find_free_offset(){
     for(int i = 0 ; i < MAX_PSYC_PAGES ; i++){
         if(!p->file_pages[i])
             return i;
-    }
-    return -1;
-}
-
-int
-find_free_offset_mem(){
-    struct proc* p = myproc();
-    for(int i = 0 ; i < MAX_PSYC_PAGES ; i++){
-        if(!p->mem_pages[i]){
-            p->mem_pages[i] = 1;
-            return i;
-        }
     }
     return -1;
 }
@@ -897,7 +886,6 @@ reset_page(struct page_md* page){
       p->swapPages--;
   }
   page->stat = NONUSED;
-  page->va = -1;
   page->ctime = -1;
   page->offset = -1;
 }

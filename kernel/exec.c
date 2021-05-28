@@ -20,9 +20,7 @@ exec(char *path, char **argv)
   struct proghdr ph;
   pagetable_t pagetable = 0, oldpagetable;
   struct proc *p = myproc();
-
-  printf("in exec my pid = %d    , p->ramPages =  %d\n", p->pid, p->ramPages);
-  
+  p->shFlag = 0;
 
   // #if(SELECTION == NFUA || SELECTION == LAPA || SELECTION == SCFIFO)
   //   struct page_md pages_backup[MAX_TOTAL_PAGES];
@@ -160,9 +158,6 @@ exec(char *path, char **argv)
   p->trapframe->epc = elf.entry;  // initial program counter = main
   p->trapframe->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
- printf("hereeeeeeeeeeeeeeee\n");
-
-
 
   // int number_of_pages = sz/4096;
   // if(sz%4096 !=0)

@@ -20,10 +20,15 @@ extern int devintr();
 int
 countBits(int num){
   int count = 0;
-  while(num){
+  //printf("inside count bits with num %d\n", num);
+  int i = 0;
+  while(i<32){
     count += num & 1;
+    //printf("count: %d ", count);
     num >>= 1;
+    i++;
   }
+  //printf("\n");
   return count;
 }
 
@@ -46,7 +51,6 @@ pageToSwapFile(){
   for(int i = 0; i< MAX_TOTAL_PAGES; i++){
     pagemd = &p->total_pages[i];
     if(pagemd->stat == MEMORY){
-      //printf("page: %d, va: %d, counter: %d\n", i, pagemd->va, pagemd->counter);
       if(pagemd->counter < min_value){
         min_value = pagemd->counter;
         min_page = i;
@@ -61,20 +65,15 @@ pageToSwapFile(){
   if((swapfile_offset = find_free_offset()) < 0)
     return 0;
 
+    // move the page to file
 
   pagemd = &p->total_pages[min_page];
-  // printf("pagemd = %p\n", pagemd);
-  printf("min_page = %d\n" , min_page);
   pagemd -> offset = swapfile_offset * PGSIZE;
   pagemd -> counter = 0;
   pagemd -> stat = FILE;
   pagemd -> ctime = -1;
-  p->mem_pages[pagemd->va/4096]=0;
+  
   pte_t* pteToRemove = walk(p->pagetable, (uint64)pagemd->va, 0);
-
-  // printf("(char*) pagemd->va = %p\n" , (char*) pagemd->va);
-  // printf("pa = %p\n" , (char*)(PTE2PA(*pteToRemove)));
-  // printf("pagemd -> offset = %d\n" , pagemd -> offset);
   if(writeToSwapFile(p, (char*)(PTE2PA(*pteToRemove)), pagemd -> offset, PGSIZE) == 0){
     panic("return 0 from writeToSwapFile\n");
     return 0;
@@ -88,9 +87,7 @@ pageToSwapFile(){
 
   p->swapPages ++;
   p->ramPages --;
-  //sfence_vma();
   kfree((void*)(PTE2PA(*pteToRemove)));
-  pagemd -> va = 0;
   return 1;
 
   #else
@@ -98,11 +95,14 @@ pageToSwapFile(){
   #ifdef LAPA
 
   struct proc *p = myproc();
+  printf("LAPA with pid %d\n", p->pid);
+
   struct page_md *pagemd;
+  int swapfile_offset;
 
   // finding the smallest number of "1" counter
   
-  int min_number_of_1= 8;     //max number of 1 in int
+  int min_number_of_1= 33;     //max number of 1 in int
   int min_value= 2147483647;  //max value of int
   int min_page=-1;
   for(int i = 0; i< MAX_TOTAL_PAGES; i++){
@@ -122,12 +122,10 @@ pageToSwapFile(){
       }
     }
   }
-
   if(min_page == -1)
     return 0;
 
-  int swapfile_offset; = find_free_offset();
-  if(swapfile_offset = find_free_offset() < 0)
+  if((swapfile_offset = find_free_offset()) < 0)
     return 0;
 
     // move the page to file
@@ -136,27 +134,36 @@ pageToSwapFile(){
   pagemd -> counter = 0xFFFFFFFF;
   pagemd -> stat = FILE;
   pagemd -> offset = swapfile_offset * PGSIZE;
-  page_md -> ctime = -1;
-  if(writeToSwapFile(p, (char*) pagemd->va, pagemd -> offset, PGSIZE) == 0)
-    return 0;
-  // TODO: check this below
+  pagemd -> ctime = -1;
+
   pte_t* pteToRemove = walk(p->pagetable, (uint64)pagemd->va, 0);
+  if(writeToSwapFile(p, (char*) (PTE2PA(*pteToRemove)), pagemd -> offset, PGSIZE) == 0){
+    panic("return 0 from writeToSwapFile\n");
+    return 0;
+  }
+
+  p->file_pages[swapfile_offset] = 1;
 
   *pteToRemove |= PTE_PG; // in disk
   *pteToRemove &= ~PTE_V; // not valid
-  p->swapPages += 1;
-  p->ramPages -= 1;
-  
-  //kfree((void*)(PTE2PA(*pteToRemove)));
+
+  p->swapPages ++;
+  p->ramPages --;
+  kfree((void*)(PTE2PA(*pteToRemove)));
+  return 1;
+
   #else
 
   #ifdef SCFIFO
 
   struct proc *p = myproc();
+  printf("SCFIFO with pid %d\n", p->pid);
+
   struct page_md *pagemd;
   int ctime;
   int place;
   int swapfile_offset;
+
   while(1){
     ctime = -1;
     place = -1;
@@ -182,28 +189,29 @@ pageToSwapFile(){
 
   // move the page to file
 
-
-
   if((swapfile_offset = find_free_offset()) < 0)
     return 0;
 
-  // pagemd = &p->total_pages[place];
   pagemd -> counter = 0;
   pagemd -> stat = FILE;
   pagemd -> offset = swapfile_offset * PGSIZE;
   pagemd -> ctime = -1;
-  if(writeToSwapFile(p, (char*) pagemd->va, pagemd -> offset, PGSIZE) == 0)
-    return 0;
-  // TODO: check this below
+
   pte_t* pteToRemove = walk(p->pagetable, (uint64)pagemd->va, 0);
+
+
+  if(writeToSwapFile(p, (char*) (PTE2PA(*pteToRemove)), pagemd -> offset, PGSIZE) == 0)
+    return 0;
 
   *pteToRemove |= PTE_PG; // in disk
   *pteToRemove &= ~PTE_V; // not valid
 
-  p->swapPages += 1;
-  p->ramPages -= 1;
+  p->file_pages[swapfile_offset] = 1;
+  p->swapPages ++;
+  p->ramPages --;
   
   kfree((void*)(PTE2PA(*pteToRemove)));
+  return 1;
 
   #endif
   #endif
@@ -269,32 +277,32 @@ usertrap(void)
     #ifndef NONE
     uint64 scause = r_scause();
     uint64 stval = r_stval();
-    struct page_md* currPage;
     // TODO: maybe PGROUNDDOWN(stval) is not neccessery and stval is fine.
     uint64 va = PGROUNDDOWN(stval);
     pte_t *pte = walk(p->pagetable, va, 1);
 
     // If segmentation fault is 13 or 15 and page is in swap file 
-    if(p->pid > 2 && (scause == 13 || scause == 15) && PAGEDOUT(PTE_FLAGS(*pte))){
-      
+    if(p->pid > 2 && (scause == 13 || scause == 15) && PAGEDOUT(*pte)){
+      //printf("inside trap, didn't found a page\n");
+      //printf("stval %d, va %d\n", stval, va);
+      struct page_md* currPage;
       // Try and find the page with the requested va
       for(int i = 0 ; i < MAX_TOTAL_PAGES ; i++){
-        if (p->total_pages[i].va == (uint64)stval && p->total_pages[i].stat == FILE) {
-            currPage = &p->total_pages[i];
+        currPage = &p->total_pages[i];
+        if (currPage->va == va && currPage->stat == FILE) {
             goto found;
         }
       }
-
+      printf("didn't find page with address %d\n", va);
       printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
       printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
       p->killed = 1; 
 
       found:      
-
       // Read data from swap file to the virtual address of the page
-      if(readFromSwapFile(p, (char*)currPage->va, currPage->offset * PGSIZE, PGSIZE) == -1)
+      if(readFromSwapFile(p, (char*)(PTE2PA(*pte)), currPage->offset * PGSIZE, PGSIZE) == -1)
         panic("can't read from swap file");
-
+      //printf("finish to read from swap\n");
       if (p->ramPages == MAX_PSYC_PAGES){
         p->file_pages[currPage->offset] = 0;
         pageToSwapFile();

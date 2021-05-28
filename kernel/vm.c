@@ -171,7 +171,7 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
   for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
     if((pte = walk(pagetable, a, 0)) == 0)
       panic("uvmunmap: walk");
-    if((*pte & PTE_V) == 0)
+    if((*pte & PTE_V) == 0 && (*pte & PTE_PG)==0)
       panic("uvmunmap: not mapped");
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
@@ -227,7 +227,6 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
   #ifndef NONE
   // TODO: check if really round up
   int numToAdd = (PGROUNDUP(newsz) - oldsz) / PGSIZE;
-  printf("numToAdd = %d\n", numToAdd);
   
   if (is_place_available(numToAdd))
         panic("Not enough space!");
@@ -252,11 +251,8 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
     swap_out_if_neccessery();
     //i++;
     add_page((uint64) a);
-    printf("uvmalloc: a = %d   , newsz = %d    , oldsz = %d\n", a, newsz, oldsz);
     #endif
   }
-
-  printf("end of uvmalloc\n");
   return newsz;
 }
 
@@ -296,7 +292,7 @@ uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
   #endif
   if(PGROUNDUP(newsz) < PGROUNDUP(oldsz)){
     int npages = (PGROUNDUP(oldsz) - PGROUNDUP(newsz)) / PGSIZE;
-    printf("here4\n");
+    printf("in uvmdealloc\n");
     uvmunmap(pagetable, PGROUNDUP(newsz), npages, 1);
   }
 
@@ -328,8 +324,8 @@ freewalk(pagetable_t pagetable)
 void
 uvmfree(pagetable_t pagetable, uint64 sz)
 {
-  if(sz > 0){
-    uvmunmap(pagetable, 0, PGROUNDUP(sz)/PGSIZE, 1);}
+  if(sz > 0)
+    uvmunmap(pagetable, 0, PGROUNDUP(sz)/PGSIZE, 1);
   freewalk(pagetable);
 }
 
@@ -365,6 +361,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   return 0;
 
  err:
+  printf("in uvmcopy\n");
   uvmunmap(new, 0, i / PGSIZE, 1);
   return -1;
 }

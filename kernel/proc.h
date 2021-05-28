@@ -124,6 +124,4 @@ struct proc {
   int shFlag;
   struct page_md total_pages [MAX_TOTAL_PAGES]; // All the pages should be here
   int file_pages [MAX_PSYC_PAGES];  // Available places in file
-  int mem_pages [MAX_PSYC_PAGES];  // Available places in memory
-  //struct page_md mem_pages [MAX_PSYC_PAGES];   // Pointer to the pages in the memory
 };

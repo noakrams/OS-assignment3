@@ -154,7 +154,7 @@ main(void)
       break;
     }
   }
-
+  int i = 0;
   // Read and run input commands.
   while(getcmd(buf, sizeof(buf)) >= 0){
     if(buf[0] == 'c' && buf[1] == 'd' && buf[2] == ' '){
@@ -164,8 +164,12 @@ main(void)
         fprintf(2, "cannot cd %s\n", buf+3);
       continue;
     }
-    if(fork1() == 0)
+    printf("main sh: fork1 iteration %d\n", i);
+    i++;
+    if(fork1() == 0){
+      printf("going to runcmnd!!!!!!!!!!\n");
       runcmd(parsecmd(buf));
+    }
     wait(0);
   }
   exit(0);
@@ -195,6 +199,7 @@ fork1(void)
 struct cmd*
 execcmd(void)
 {
+  printf("execcmd\n");
   struct execcmd *cmd;
 
   cmd = malloc(sizeof(*cmd));
@@ -223,7 +228,6 @@ struct cmd*
 pipecmd(struct cmd *left, struct cmd *right)
 {
   struct pipecmd *cmd;
-
   cmd = malloc(sizeof(*cmd));
   memset(cmd, 0, sizeof(*cmd));
   cmd->type = PIPE;
@@ -345,7 +349,6 @@ struct cmd*
 parseline(char **ps, char *es)
 {
   struct cmd *cmd;
-
   cmd = parsepipe(ps, es);
   while(peek(ps, es, "&")){
     gettoken(ps, es, 0, 0);

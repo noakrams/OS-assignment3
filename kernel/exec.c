@@ -20,30 +20,32 @@ exec(char *path, char **argv)
   struct proghdr ph;
   pagetable_t pagetable = 0, oldpagetable;
   struct proc *p = myproc();
-  struct page_md pages_backup[MAX_TOTAL_PAGES];
-  int file_pages_backup[MAX_PSYC_PAGES];
-  int ramPages_backup = 0;
-  int swapPages_backup = 0;
+
+  printf("in exec my pid = %d    , p->ramPages =  %d\n", p->pid, p->ramPages);
   
 
-  #if(SELECTION == NFUA || SELECTION == LAPA || SELECTION == SCFIFO)
-    if(p->pid > 2){
+  // #if(SELECTION == NFUA || SELECTION == LAPA || SELECTION == SCFIFO)
+  //   struct page_md pages_backup[MAX_TOTAL_PAGES];
+  //   int file_pages_backup[MAX_PSYC_PAGES];
+  //   int ramPages_backup = 0;
+  //   int swapPages_backup = 0;
 
-      ramPages_backup = p->ramPages;
-      swapPages_backup = p->swapPages;
+  //   if(p->pid > 2){
+  //     ramPages_backup = p->ramPages;
+  //     swapPages_backup = p->swapPages;
 
-      p->ramPages = 0;
-      p->swapPages = 0;
+  //     p->ramPages = 0;
+  //     p->swapPages = 0;
 
-      for(int i = 0 ; i < MAX_TOTAL_PAGES ; i++)
-        pages_backup[i] = p->total_pages[i];
+  //     for(int i = 0 ; i < MAX_TOTAL_PAGES ; i++)
+  //       pages_backup[i] = p->total_pages[i];
       
 
-      for(int i = 0 ; i < MAX_PSYC_PAGES; i++)
-        file_pages_backup[i] = p->file_pages[i];
-    }
+  //     for(int i = 0 ; i < MAX_PSYC_PAGES; i++)
+  //       file_pages_backup[i] = p->file_pages[i];
+  //   }
 
-  #endif
+  // #endif
 
   begin_op();
 
@@ -99,6 +101,24 @@ exec(char *path, char **argv)
   sp = sz;
   stackbase = sp - PGSIZE;
 
+
+  #ifndef NONE
+    struct page_md *pagemd;
+    if(p->pid > 2){
+      
+      for(int i = 0 ; i< MAX_TOTAL_PAGES; i++){
+          pagemd = &p->total_pages[i];
+          pagemd -> stat = NONUSED;
+          pagemd -> va = -1;
+      }
+      p->ramPages = 0;
+      p->swapPages = 0;
+      removeSwapFile(p);
+      createSwapFile(p);
+    }
+  #endif
+
+
   // Push argument strings, prepare rest of stack in ustack.
   for(argc = 0; argv[argc]; argc++) {
     if(argc >= MAXARG)
@@ -132,22 +152,6 @@ exec(char *path, char **argv)
       last = s+1;
   safestrcpy(p->name, last, sizeof(p->name));
 
-  #if(SELECTION == NFUA || SELECTION == LAPA || SELECTION == SCFIFO)
-    struct page_md *pagemd;
-    if(p->pid > 2){
-      for(int i = 0 ; i < MAX_TOTAL_PAGES; i++){
-          pagemd = & p->total_pages[i];
-          pagemd -> stat = NONUSED;
-          pagemd -> va = -1;
-          pagemd -> offset = -1;
-          pagemd -> counter = 0;
-      }
-      p->ramPages = 0;
-      p->swapPages = 0;
-      removeSwapFile(p);
-      createSwapFile(p);
-    }
-  #endif
     
   // Commit to the user image.
   oldpagetable = p->pagetable;
@@ -156,6 +160,8 @@ exec(char *path, char **argv)
   p->trapframe->epc = elf.entry;  // initial program counter = main
   p->trapframe->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
+ printf("hereeeeeeeeeeeeeeee\n");
+
 
 
   // int number_of_pages = sz/4096;
@@ -173,26 +179,26 @@ exec(char *path, char **argv)
   //   #endif
   // }
 
-
+  
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:
   if(pagetable)
     proc_freepagetable(pagetable, sz);
 
-  #if (SELECTION == SCFIFO || SELECTION == NFUA || SELECTION == LAPA)
-    if(p->pid > 2){
-      p->ramPages = ramPages_backup;
-      p->swapPages = swapPages_backup;
+  // #if (SELECTION == SCFIFO || SELECTION == NFUA || SELECTION == LAPA)
+  //   if(p->pid > 2){
+  //     p->ramPages = ramPages_backup;
+  //     p->swapPages = swapPages_backup;
 
-      for(int i = 0 ; i < MAX_TOTAL_PAGES ; i++)
-        p->total_pages[i] = pages_backup[i]; 
+  //     for(int i = 0 ; i < MAX_TOTAL_PAGES ; i++)
+  //       p->total_pages[i] = pages_backup[i]; 
       
 
-      for(int i = 0 ; i < MAX_PSYC_PAGES; i++)
-        p->file_pages[i] = file_pages_backup[i];
-    }
-  #endif
+  //     for(int i = 0 ; i < MAX_PSYC_PAGES; i++)
+  //       p->file_pages[i] = file_pages_backup[i];
+  //   }
+  // #endif
 
   if(ip){
     iunlockput(ip);

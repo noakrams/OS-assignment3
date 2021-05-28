@@ -219,7 +219,6 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 {
   char *mem;
   uint64 a;
-  
 
   if(newsz < oldsz)
     return oldsz;
@@ -228,13 +227,13 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
   #ifndef NONE
   // TODO: check if really round up
   int numToAdd = (PGROUNDUP(newsz) - oldsz) / PGSIZE;
+  printf("numToAdd = %d\n", numToAdd);
   
   if (is_place_available(numToAdd))
         panic("Not enough space!");
 
   
   #endif
-
   for(a = oldsz; a < newsz; a += PGSIZE){
     mem = kalloc();
     if(mem == 0){
@@ -251,12 +250,13 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
     // Add the new allocated pages to our data structure
     //oldsz, newsz, numToAdd
     swap_out_if_neccessery();
-    i++;
+    //i++;
     add_page((uint64) a);
+    printf("uvmalloc: a = %d   , newsz = %d    , oldsz = %d\n", a, newsz, oldsz);
     #endif
-
   }
 
+  printf("end of uvmalloc\n");
   return newsz;
 }
 
@@ -267,12 +267,14 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 uint64
 uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 {
-  pte_t *pte;
-  uint a;
-  struct page_md* pageToRemove;
 
   if(newsz >= oldsz)
     return oldsz;
+
+  #ifndef NONE
+  pte_t *pte;
+  uint a;
+  struct page_md* pageToRemove;
 
   a = PGROUNDUP(newsz);
   
@@ -291,8 +293,10 @@ uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
     }
   }
 
+  #endif
   if(PGROUNDUP(newsz) < PGROUNDUP(oldsz)){
     int npages = (PGROUNDUP(oldsz) - PGROUNDUP(newsz)) / PGSIZE;
+    printf("here4\n");
     uvmunmap(pagetable, PGROUNDUP(newsz), npages, 1);
   }
 
@@ -324,8 +328,8 @@ freewalk(pagetable_t pagetable)
 void
 uvmfree(pagetable_t pagetable, uint64 sz)
 {
-  if(sz > 0)
-    uvmunmap(pagetable, 0, PGROUNDUP(sz)/PGSIZE, 1);
+  if(sz > 0){
+    uvmunmap(pagetable, 0, PGROUNDUP(sz)/PGSIZE, 1);}
   freewalk(pagetable);
 }
 

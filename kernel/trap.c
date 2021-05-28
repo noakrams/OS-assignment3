@@ -33,8 +33,9 @@ pageToSwapFile(){
 
   #ifdef NFUA
 
-  printf("NFUA\n");
   struct proc *p = myproc();
+  printf("NFUA with pid %d\n", p->pid);
+
   struct page_md *pagemd;
   int swapfile_offset;
 
@@ -45,6 +46,7 @@ pageToSwapFile(){
   for(int i = 0; i< MAX_TOTAL_PAGES; i++){
     pagemd = &p->total_pages[i];
     if(pagemd->stat == MEMORY){
+      //printf("page: %d, va: %d, counter: %d\n", i, pagemd->va, pagemd->counter);
       if(pagemd->counter < min_value){
         min_value = pagemd->counter;
         min_page = i;
@@ -61,32 +63,34 @@ pageToSwapFile(){
 
 
   pagemd = &p->total_pages[min_page];
-  printf("pagemd = %p\n", pagemd);
+  // printf("pagemd = %p\n", pagemd);
   printf("min_page = %d\n" , min_page);
   pagemd -> offset = swapfile_offset * PGSIZE;
   pagemd -> counter = 0;
   pagemd -> stat = FILE;
   pagemd -> ctime = -1;
+  p->mem_pages[pagemd->va/4096]=0;
   pte_t* pteToRemove = walk(p->pagetable, (uint64)pagemd->va, 0);
-  printf("(char*) pagemd->va = %p\n" , (char*) pagemd->va);
-  printf("pa = %p\n" , (char*)(PTE2PA(*pteToRemove)));
-  printf("pagemd -> offset = %d\n" , pagemd -> offset);
+
+  // printf("(char*) pagemd->va = %p\n" , (char*) pagemd->va);
+  // printf("pa = %p\n" , (char*)(PTE2PA(*pteToRemove)));
+  // printf("pagemd -> offset = %d\n" , pagemd -> offset);
   if(writeToSwapFile(p, (char*)(PTE2PA(*pteToRemove)), pagemd -> offset, PGSIZE) == 0){
     panic("return 0 from writeToSwapFile\n");
     return 0;
   }
 
+
   p->file_pages[swapfile_offset] = 1;
-  
   
   *pteToRemove |= PTE_PG; // in disk
   *pteToRemove &= ~PTE_V; // not valid
 
-  p->swapPages += 1;
-  p->ramPages -= 1;
-  
+  p->swapPages ++;
+  p->ramPages --;
+  //sfence_vma();
   kfree((void*)(PTE2PA(*pteToRemove)));
-
+  pagemd -> va = 0;
   return 1;
 
   #else
@@ -298,8 +302,8 @@ usertrap(void)
 
       // refresh TLB
       // sfence_vma();
-      // Turn off swap bit
-      *pte &= ~PTE_PG;
+      *pte &= ~PTE_PG; // Turn off swap bit
+      *pte |= PTE_V; // Turn on valid bit
 
       // Update process and current page
       //p->file_pages[currPage->offset] = 0;
@@ -308,6 +312,7 @@ usertrap(void)
       currPage->ctime = ticks;
       p->file_pages[currPage->offset/PGSIZE] = 0;
       p->ramPages++;
+      //printf("inside usertrap, rampages %d\n", p->ramPages);
       p->swapPages--;
     }
 

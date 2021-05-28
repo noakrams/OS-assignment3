@@ -192,6 +192,7 @@ proc_pagetable(struct proc *p)
   // map the trapframe just below TRAMPOLINE, for trampoline.S.
   if(mappages(pagetable, TRAPFRAME, PGSIZE,
               (uint64)(p->trapframe), PTE_R | PTE_W) < 0){
+                printf("here1\n");
     uvmunmap(pagetable, TRAMPOLINE, 1, 0);
     uvmfree(pagetable, 0);
     return 0;
@@ -276,6 +277,7 @@ fork(void)
   int i, pid;
   struct proc *np;
   struct proc *p = myproc();
+  printf("inside fork    , p->pid = %d   ,  p->ramPages = %d\n" , p->pid, p->ramPages);
 
   // Allocate process.
   if((np = allocproc()) == 0){
@@ -305,7 +307,6 @@ fork(void)
   safestrcpy(np->name, p->name, sizeof(p->name));
 
   pid = np->pid;
-
 
   #ifndef NONE
 
@@ -337,26 +338,30 @@ fork(void)
       np->file_pages[i] = p->file_pages[i];
     }
 
-      release(&np->lock);
-      if(p->pid > 2){
-        char buf[PGSIZE / 2];
-        for(int i = 0; i < (MAX_TOTAL_PAGES - 1) * PGSIZE; i += PGSIZE/2){
-          readFromSwapFile(p,buf,i,PGSIZE/2);
-          writeToSwapFile(np,buf,i,PGSIZE/2);
-        }
+    release(&np->lock);
+    if(p->pid > 2){
+      char buf[PGSIZE / 2];
+      for(int i = 0; i < (MAX_TOTAL_PAGES - 1) * PGSIZE; i += PGSIZE/2){
+        readFromSwapFile(p,buf,i,PGSIZE/2);
+        writeToSwapFile(np,buf,i,PGSIZE/2);
       }
-
-      acquire(&np->lock); 
+    }
+    acquire(&np->lock); 
 
   }
   #endif
 
   release(&np->lock);
 
+  if(p->pid == 2) np->shFlag = 1;
+
   acquire(&wait_lock);
   np->parent = p;
   np->ramPages = p->ramPages;
   np->swapPages = p->swapPages;
+  for(int i = 0; i< MAX_TOTAL_PAGES; i++){
+    np->total_pages[i] = p->total_pages[i];
+  }
   release(&wait_lock);
 
   acquire(&np->lock);
@@ -387,6 +392,7 @@ reparent(struct proc *p)
 void
 exit(int status)
 {
+
   struct proc *p = myproc();
 
   if(p == initproc)
@@ -406,7 +412,7 @@ exit(int status)
   end_op();
   p->cwd = 0;
 
-  #if (SELECTION == SCFIFO || SELECTION == NFUA || SELECTION == LAPA)
+  #ifndef NONE
     if(p->pid > 2){
       removeSwapFile(p);
       for(int i = 0 ; i < MAX_PSYC_PAGES; i++){
@@ -415,9 +421,19 @@ exit(int status)
     }
   
   #endif
-  printf("p->ramPages = %d     ,   p->swapPages = %d\n" , p->ramPages, p->swapPages);
   p->ramPages = 0;
   p->swapPages = 0;
+  struct page_md *pagemd;
+  for(int i = 0; i< MAX_TOTAL_PAGES; i++){
+    pagemd = &p->total_pages[i];
+    page_md_free(pagemd);
+    pagemd->counter = 0;
+    pagemd->ctime=0;
+    pagemd->offset=0;
+    pagemd->va=0;
+    pagemd->stat=UNUSED;
+
+  }
 
   acquire(&wait_lock);
 
@@ -435,7 +451,6 @@ exit(int status)
   p->state = ZOMBIE;
 
   release(&wait_lock);
-
   // Jump into the scheduler, never to return.
   sched();
   panic("zombie exit");
@@ -499,9 +514,13 @@ update_AGING(){
     if(pagemd->stat == MEMORY){
         pte_t *pte = walk(p->pagetable, pagemd->va, 0);
         int accessed = *pte & PTE_A;
+        accessed<<=1; 
+        // printf("inside AGING, pid %d, page %d, old counter %d, accessed bit %d",p->pid, i, pagemd->counter, accessed);
         pagemd->counter >>= 1;
-        pagemd->counter |= (accessed<<7);
+        //pagemd->counter &= ~accessed; //reset the bit of the accessed
+        pagemd->counter |= accessed;  //change the last bit of the counter if need to
         *pte &= ~PTE_A; // clear pte_a
+        //printf(", new counter %d\n", pagemd->counter);
     }
   }
 }
@@ -535,9 +554,9 @@ scheduler(void)
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
-
+        #ifndef NONE
         update_AGING(); //update which pages it accessed,
-
+        #endif
         c->proc = 0;
       }
       release(&p->lock);
@@ -764,7 +783,9 @@ int page_md_free(struct page_md* pagemd){
 void
 add_page(uint64 va){
   struct proc *p = myproc();
-  if(p->pid <= 2) return;
+
+  if(p->pid <= 2 || p->shFlag) return;
+
   struct page_md* pagemd;
   for (int i = 0; i < MAX_TOTAL_PAGES; i++) {
     pagemd = &p->total_pages[i];
@@ -773,17 +794,25 @@ add_page(uint64 va){
     }
   }
 
+
   panic("Can't find NONUSED page in add_page\n");
+
+  // printf("p->ramPages = %d\n" , p->ramPages);
+  // printf("p->swapPages = %d\n" , p->swapPages);
+  //panic("Can't find NONUSED page in add_page\n");
+
 
   // TODO: initialize counter according to the SELECTION
   found:
+
   pagemd->stat = MEMORY;
   pagemd->ctime = ticks;
   pagemd->va = va;
   pagemd->offset = 0;
   pagemd->counter = 0;
   p->ramPages += 1;
-  
+  //printf("inside add pages, rampages %d\n", p->ramPages);
+
   #ifdef LAPA
   pagemd -> counter = 0xFFFFFFFF;
   #endif
@@ -792,31 +821,29 @@ add_page(uint64 va){
 int
 is_place_available(int numToAdd){
   struct proc* p = myproc();
-  printf("p->pid = %d\n" , p->pid);
-  printf("p->ramPages = %d\n" , p->ramPages);
-  printf("p->swapPages = %d\n" , p->swapPages);
-  printf("numToAdd = %d\n" , numToAdd);
   return p->pid > 2 && p->ramPages + p->swapPages + numToAdd > MAX_TOTAL_PAGES;
 }
 
 //uint64 oldSize , uint64 newSize, int numToAdd
 void
-swap_out_if_neccessery(void){
+swap_out_if_neccessery(){
   
   
   struct proc* p = myproc();
 
-  if(p->pid <= 2) return;
   // int num_to_swap = 0;
 
-  // num_to_swap = 1 + p->ramPages + numToAdd - MAX_PSYC_PAGES;
+  //int num_to_swap;
+
+
+  //num_to_swap = 1 + p->ramPages + numToAdd - MAX_PSYC_PAGES;
   // printf("in swap_out_if_neccessery. p->swapPages = %d\n" , p->swapPages);
-  if(p->pid <= 2 || p->ramPages < MAX_PSYC_PAGES)
+  if(p->pid <= 2 || p->ramPages < MAX_PSYC_PAGES || p->shFlag)
     return;
 
  // for(; oldSize < newSize && num_to_swap > 0 ; oldSize += PGSIZE){
-      printf("p->ramPages = %d , swapping\n" , p->ramPages);
-      pageToSwapFile();
+  printf("p->ramPages = %d , swapping\n" , p->ramPages);
+  pageToSwapFile();
   //     num_to_swap -= 1;
   // }
 }
@@ -827,6 +854,18 @@ find_free_offset(){
     for(int i = 0 ; i < MAX_PSYC_PAGES ; i++){
         if(!p->file_pages[i])
             return i;
+    }
+    return -1;
+}
+
+int
+find_free_offset_mem(){
+    struct proc* p = myproc();
+    for(int i = 0 ; i < MAX_PSYC_PAGES ; i++){
+        if(!p->mem_pages[i]){
+            p->mem_pages[i] = 1;
+            return i;
+        }
     }
     return -1;
 }
@@ -860,6 +899,7 @@ reset_page(struct page_md* page){
   page->stat = NONUSED;
   page->va = -1;
   page->ctime = -1;
+  page->offset = -1;
 }
 
 int

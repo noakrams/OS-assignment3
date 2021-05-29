@@ -20,15 +20,14 @@ extern int devintr();
 int
 countBits(int num){
   int count = 0;
-  //printf("inside count bits with num %d\n", num);
   int i = 0;
+
   while(i<32){
     count += num & 1;
-    //printf("count: %d ", count);
     num >>= 1;
     i++;
   }
-  //printf("\n");
+
   return count;
 }
 
@@ -61,7 +60,6 @@ pageToSwapFile(){
   if(min_page == -1)
     return 0;
 
-   
   if((swapfile_offset = find_free_offset()) < 0)
     return 0;
 
@@ -78,7 +76,6 @@ pageToSwapFile(){
     panic("return 0 from writeToSwapFile\n");
     return 0;
   }
-
 
   p->file_pages[swapfile_offset] = 1;
   
@@ -199,7 +196,6 @@ pageToSwapFile(){
 
   pte_t* pteToRemove = walk(p->pagetable, (uint64)pagemd->va, 0);
 
-
   if(writeToSwapFile(p, (char*) (PTE2PA(*pteToRemove)), pagemd -> offset, PGSIZE) == 0)
     return 0;
 
@@ -218,7 +214,6 @@ pageToSwapFile(){
   #endif
 
   return 1;
-
 }
 
 void
@@ -277,15 +272,15 @@ usertrap(void)
     #ifndef NONE
     uint64 scause = r_scause();
     uint64 stval = r_stval();
-    // TODO: maybe PGROUNDDOWN(stval) is not neccessery and stval is fine.
+
     uint64 va = PGROUNDDOWN(stval);
     pte_t *pte = walk(p->pagetable, va, 1);
 
     // If segmentation fault is 13 or 15 and page is in swap file 
-    if(p->pid > 2 && (scause == 13 || scause == 15) && PAGEDOUT(*pte)){
-      //printf("inside trap, didn't found a page\n");
-      //printf("stval %d, va %d\n", stval, va);
+    if(p->pid > 2 && (scause == 12 || scause == 13 || scause == 15) && PAGEDOUT(*pte)){
+
       struct page_md* currPage;
+
       // Try and find the page with the requested va
       for(int i = 0 ; i < MAX_TOTAL_PAGES ; i++){
         currPage = &p->total_pages[i];
@@ -293,16 +288,18 @@ usertrap(void)
             goto found;
         }
       }
-      printf("didn't find page with address %d\n", va);
       printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
       printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
       p->killed = 1; 
 
-      found:      
+      found:
+
+      printf("Page fault, read page from swapfile\n");
+
       // Read data from swap file to the virtual address of the page
       if(readFromSwapFile(p, (char*)(PTE2PA(*pte)), currPage->offset * PGSIZE, PGSIZE) == -1)
         panic("can't read from swap file");
-      //printf("finish to read from swap\n");
+
       if (p->ramPages == MAX_PSYC_PAGES){
         p->file_pages[currPage->offset] = 0;
         pageToSwapFile();
@@ -314,13 +311,11 @@ usertrap(void)
       *pte |= PTE_V; // Turn on valid bit
 
       // Update process and current page
-      //p->file_pages[currPage->offset] = 0;
       currPage->offset = -1;
       currPage->stat = MEMORY;
       currPage->ctime = ticks;
       p->file_pages[currPage->offset/PGSIZE] = 0;
       p->ramPages++;
-      //printf("inside usertrap, rampages %d\n", p->ramPages);
       p->swapPages--;
     }
 
@@ -336,13 +331,6 @@ usertrap(void)
       p->killed = 1;
     #endif
   }
-
-          // TODO: a page needs to be swapped!  --> TASK2
-        // if (this_proc->pages_in_ram + 1 >= MAX_PSYC_PAGES) {
-        //     if(swap_out() == -1)
-        //         return -1;
-        //     lcr3(V2P(this_proc->pgdir));
-        // }
 
   if(p->killed)
     exit(-1);

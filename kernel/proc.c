@@ -193,7 +193,6 @@ proc_pagetable(struct proc *p)
   // map the trapframe just below TRAMPOLINE, for trampoline.S.
   if(mappages(pagetable, TRAPFRAME, PGSIZE,
               (uint64)(p->trapframe), PTE_R | PTE_W) < 0){
-                printf("here1\n");
     uvmunmap(pagetable, TRAMPOLINE, 1, 0);
     uvmfree(pagetable, 0);
     return 0;
@@ -432,8 +431,7 @@ exit(int status)
     pagemd->ctime=0;
     pagemd->offset=0;
     pagemd->va=0;
-    pagemd->stat=UNUSED;
-
+    pagemd->stat=NONUSED;
   }
 
   acquire(&wait_lock);
@@ -444,8 +442,6 @@ exit(int status)
   // Parent might be sleeping in wait().
   wakeup(p->parent);
 
-
-  
   acquire(&p->lock);
 
   p->xstate = status;
@@ -516,12 +512,9 @@ update_AGING(){
         pte_t *pte = walk(p->pagetable, pagemd->va, 0);
         int accessed = *pte & PTE_A;
         accessed<<=1; 
-        // printf("inside AGING, pid %d, page %d, old counter %d, accessed bit %d",p->pid, i, pagemd->counter, accessed);
         pagemd->counter >>= 1;
-        //pagemd->counter &= ~accessed; //reset the bit of the accessed
         pagemd->counter |= accessed;  //change the last bit of the counter if need to
         *pte &= ~PTE_A; // clear pte_a
-        //printf(", new counter %d\n", pagemd->counter);
     }
   }
 }
@@ -756,7 +749,6 @@ procdump(void)
   }
 }
 
-// TODO: maybe delete this function
 int page_md_free(struct page_md* pagemd){
     if(pagemd == 0)
         return -1;
@@ -773,7 +765,6 @@ int page_md_free(struct page_md* pagemd){
             pagemd->stat = NONUSED;
             pagemd->ctime = -1;
             pagemd->va = -1;
-            //sfence_vma();
             kfree((void*)pa);
             return 1;
         }
@@ -785,7 +776,8 @@ void
 add_page(uint64 va){
   struct proc *p = myproc();
 
-  if(p->pid <= 2 || p->shFlag) return;
+  if(p->pid <= 2 || p->shFlag)
+    return;
 
   struct page_md* pagemd;
   for (int i = 0; i < MAX_TOTAL_PAGES; i++) {
@@ -795,15 +787,8 @@ add_page(uint64 va){
     }
   }
 
-
   panic("Can't find NONUSED page in add_page\n");
 
-  // printf("p->ramPages = %d\n" , p->ramPages);
-  // printf("p->swapPages = %d\n" , p->swapPages);
-  //panic("Can't find NONUSED page in add_page\n");
-
-
-  // TODO: initialize counter according to the SELECTION
   found:
 
   pagemd->stat = MEMORY;
@@ -811,8 +796,7 @@ add_page(uint64 va){
   pagemd->va = va;
   pagemd->offset = 0;
   pagemd->counter = 0;
-  p->ramPages += 1;
-  //printf("inside add pages, rampages %d\n", p->ramPages);
+  p->ramPages ++;
 
   #ifdef LAPA
   pagemd -> counter = 0xFFFFFFFF;
@@ -825,28 +809,16 @@ is_place_available(int numToAdd){
   return p->pid > 2 && p->ramPages + p->swapPages + numToAdd > MAX_TOTAL_PAGES;
 }
 
-//uint64 oldSize , uint64 newSize, int numToAdd
 void
 swap_out_if_neccessery(){
   
-  
   struct proc* p = myproc();
 
-  // int num_to_swap = 0;
-
-  //int num_to_swap;
-
-
-  //num_to_swap = 1 + p->ramPages + numToAdd - MAX_PSYC_PAGES;
-  // printf("in swap_out_if_neccessery. p->swapPages = %d\n" , p->swapPages);
   if(p->pid <= 2 || p->ramPages < MAX_PSYC_PAGES || p->shFlag)
     return;
 
- // for(; oldSize < newSize && num_to_swap > 0 ; oldSize += PGSIZE){
-  //printf("p->ramPages = %d , swapping\n" , p->ramPages);
   pageToSwapFile();
-  //     num_to_swap -= 1;
-  // }
+
 }
 
 int

@@ -164,10 +164,8 @@ main(void)
         fprintf(2, "cannot cd %s\n", buf+3);
       continue;
     }
-    printf("main sh: fork1 iteration %d\n", i);
     i++;
     if(fork1() == 0){
-      printf("going to runcmnd!!!!!!!!!!\n");
       runcmd(parsecmd(buf));
     }
     wait(0);
@@ -199,7 +197,6 @@ fork1(void)
 struct cmd*
 execcmd(void)
 {
-  printf("execcmd\n");
   struct execcmd *cmd;
 
   cmd = malloc(sizeof(*cmd));

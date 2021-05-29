@@ -225,7 +225,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 
   oldsz = PGROUNDUP(oldsz);
   #ifndef NONE
-  // TODO: check if really round up
+
   int numToAdd = (PGROUNDUP(newsz) - oldsz) / PGSIZE;
   
   if (is_place_available(numToAdd))
@@ -246,10 +246,8 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
       return 0;
     }
     #ifndef NONE
-    // Add the new allocated pages to our data structure
-    //oldsz, newsz, numToAdd
+
     swap_out_if_neccessery();
-    //i++;
     add_page((uint64) a);
     #endif
   }
@@ -292,7 +290,6 @@ uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
   #endif
   if(PGROUNDUP(newsz) < PGROUNDUP(oldsz)){
     int npages = (PGROUNDUP(oldsz) - PGROUNDUP(newsz)) / PGSIZE;
-    printf("in uvmdealloc\n");
     uvmunmap(pagetable, PGROUNDUP(newsz), npages, 1);
   }
 
@@ -361,7 +358,6 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   return 0;
 
  err:
-  printf("in uvmcopy\n");
   uvmunmap(new, 0, i / PGSIZE, 1);
   return -1;
 }
@@ -415,7 +411,6 @@ copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
     va0 = PGROUNDDOWN(srcva);
     pa0 = walkaddr(pagetable, va0);
     if(pa0 == 0){
-      printf("herreee\n");
       return -1;
       }
     n = PGSIZE - (srcva - va0);

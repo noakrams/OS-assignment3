@@ -1,322 +1,184 @@
-// #include "user.h"
-// #include "types.h"
-
-// #include "kernel/param.h"
-// #include "kernel/types.h"
-// #include "kernel/stat.h"
-// #include "user/user.h"
-// #include "kernel/fs.h"
-// #include "kernel/fcntl.h"
-// #include "kernel/syscall.h"
-// #include "kernel/memlayout.h"
-// #include "kernel/riscv.h"
-
 #include "kernel/types.h"
+#include "kernel/stat.h"
 #include "user/user.h"
-#define PGSIZE 4096
 
-// #define NONE 0
-// #define NFUA 1
-// #define LAPA 2
+#define PAGEZS 4096
 
-struct objectTest {
-    int arr[1024];
-};
+void SanityTest(){
 
+    char* arr[32];
+    int status;
 
-int test_no = 0;
-
-int very_simple(int pid){
-    if(pid == 0){
-        printf("rest...\n");
-        sleep(20);
-        printf("exit...\n");
-        exit(0);
-    }
-    if(pid > 0){
-        printf("Parent waiting on test %d\n", test_no);
-        wait(0);
-        printf("Done!\n");
-        return 1;
-    }
-    return 0;
-}
-
-
-int simple(int pid){
-    if(pid == 0){
-        printf("try alloc, access, free...\n");
-        char* trash = malloc(3);
-        trash[1] = 't' ;
-        if(trash[1] != 't'){
-            printf("Wrong data in simple! %c\n", trash[1]);
-        }
-        free(trash);
-        printf("Done malloc dealloc, exiting...\n");
-        exit(0);
-    }
-    if(pid > 0){
-        printf("Parent waiting on test %d\n", test_no);
-        wait(0);
-        printf("Done! malloc dealloc\n");
-        return 1;
-    }
-    return 0;
-}
-
-
-int test_paging(int pid, int pages){
-    if(pid == 0){
-        int size = pages;
-        char* pp[size];
-        for(int i = 0 ; i < size ; i++){
-            printf("Call %d for sbrk\n", i);
-            pp[i] = sbrk(PGSIZE-1);
-            *pp[i] = '0' +(char) i ;
-        }
-        printf("try accessing this data...\n");
-
-        if(size > 4 && *pp[4] != '4'){
-            printf("Wrong data in pp[4]! %c\n", *pp[4]);
-        }
-
-        if(*pp[0] != '0'){
-            printf("Wrong data in pp[0]! %c\n", *pp[0]);
-        }
-
-        if(*pp[size-1] != '0' +(char) size-1 ){
-            printf("Wrong data in pp[size-1]! %c\n", *pp[size-1]);
-        }
-
-        printf("Done allocing, exiting...\n");
-        exit(0);
-
+    printf("// allocate 5 pages //\n");
+    for(int i = 0; i < 5; i++){
+        arr[i] = sbrk(PAGEZS);
     }
 
-    if(pid >  0){
-        printf("Parent waiting on test %d\n", test_no);
-        wait(0);
-        printf("Done! alloce'd some pages\n");
-        return 1;
-    }
-    return 0;
-}
-
-
-void forkTestOur(){
-    int pid = 0;
-    pid = fork();
+    printf("// fork //\n");
+    int pid = fork();
    
     if(pid == 0){
-        
-        struct objectTest *t = malloc(4096);
-        t->arr[0] = 24;
-        t->arr[511] = 500;
-        // for(int i = 0; i < 10; i++){
-        //     malloc(4096);
-        // }
-        sbrk(10*4096);
+        printf("// iniside child //\n");
+        printf("// allocate another 15 pages for child //\n");
 
-        printf("SON: \n");
-        printf("%d\n", t->arr[0]);
-        printf("%d\n", t->arr[511]);
+        for(int i = 5; i < 20; i++){
+            arr[i] = sbrk(PAGEZS);
+        }
+
+        sleep(10);
+
+        printf("// no pagefault in the next 3 prints //\n");
+
+        for(int i=16; i<19; i++){
+            printf("arr[%d] add : %p\n", i, arr[i]);
+            arr[i][0] = 1;
+        }
+
+        printf("// pagefault in the next 3 prints //\n");
+
+        for(int i=1; i<4; i++){
+            printf("arr[%d] add : %p\n", i, arr[i]);
+            arr[i][0] = 1;
+        }
+
+        printf("// child finish his job for today //\n");
+
+        exit(0);
     }
+   
     if(pid != 0){
-        wait(&pid);
-        struct objectTest *t = malloc(4096);
-        //sbrk(20*4096);
-        t->arr[0] = 1;
-        printf("FATHER: %d\n", t->arr[0]);
-    }
-   
-    exit(0);
-}
+        wait(&status);
 
-void
-simpleswapTest (){
-    sbrk(20*4096);
+        printf("// iniside father //\n");
+        printf("// allocate another 5 pages for child //\n");
+
+        for(int i = 5; i < 10; i++){
+            arr[i] = sbrk(PAGEZS);
+        }
+
+        sleep(10);
+
+        printf("// allocate another 10 pages for child //\n");
+
+        for(int i = 10; i < 20; i++){
+            arr[i] = sbrk(PAGEZS);
+        }
+
+        printf("// no pagefault in the next 3 prints //\n");
+
+        for(int i=16; i<19; i++){
+            printf("arr[%d] add : %p\n", i, arr[i]);
+            arr[i][0] = 1;
+        }
+
+        printf("// pagefault in the next 3 prints //\n");
+
+        for(int i=1; i<4; i++){
+            printf("arr[%d] add : %p\n", i, arr[i]);
+            arr[i][0] = 1;
+        }
+
+        printf("// father finish his job for today //\n");
+
+    }
 }
 
 void forkTest(){
 
-    printf("before alloc 13 pages\n");
-    int status;
     char* arr[32];
+    int status;
 
-    for(int i=0;i<13;i++){ //todo check free space in ram
-        arr[i] = sbrk(PGSIZE);
-        //printf("arr[i] %p\n",arr[i]);
-
+    printf("// allocate 5 pages //\n");
+    for(int i = 0; i < 5; i++){
+        arr[i] = sbrk(PAGEZS);
     }
+
+    printf("// fork //\n");
     int pid = fork();
-    printf("pid %d\n",pid);
-    if(pid!=0){ //father
+   
+    if(pid == 0){
+        printf("// iniside child //\n");
+        printf("// allocate another 5 pages for child //\n");
+
+        for(int i = 5; i < 10; i++){
+            arr[i] = sbrk(PAGEZS);
+        }
+
+        sleep(10);
+
+        // for(int i = 10; i < 20; i++){
+        //     arr[i] = sbrk(PAGEZS);
+        // }
+
+        printf("// no pagefault in the next 5 prints //\n");
+
+        for(int i=4; i<10; i++){
+            printf("arr[%d] add : %p\n", i, arr[i]);
+            arr[i][0] = 1;
+        }
+
+        // printf("// pagefault in the next 5 prints //\n");
+
+        // for(int i=14; i<19; i++){
+        //     printf("arr[%d] add : %p\n", i, arr[i]);
+        //     arr[i][0] = 1;
+        // }
+
+        printf("// child finish his job for today //\n");
+
+        exit(0);
+    }
+   
+    if(pid != 0){
         wait(&status);
     }
-    else{ //child
-
-    printf("should NOT be pagefulat now\n");
-    //printf("arr[0][0]=1\n");
-    arr[0][0] = 1; //page is in ram - no page fault
-    //printf("arr[5][0]=1\n");
-    arr[5][0] = 1; //page is in ram - no page fault
-    //printf("arr[10][0]=1\n");
-    arr[10][0] = 1; //page is in ram - no page fault
-
-    exit(0);
-
-    }
-
-
-}
-
-void forkTest2(){
-    printf("before alloc 13 pages\n");
-    int status;
-    char* arr[32];
-
-    for(int i=0;i<13;i++){ //todo check free space in ram
-        arr[i] = sbrk(PGSIZE);
-        // printf("arr[%d] %p\n",i,arr[i]);
-
-    }
-    for(int j=13;j<26;j++){ //todo check free space in ram
-        arr[j] = sbrk(PGSIZE);
-        // printf("write to va %p\n",arr[j]);
-        arr[j][0] = 1;
-    }
-
-    int pid = fork();
-    //printf("PID %d \n",pid);
-    if(pid!=0){ //father
-    wait(&status);
-    }
-    else{ //child
-    sleep(15);
-    //printf("Should be pagefulat now\n");
-    for(int i=0;i<26;i++){
-        //printf("child arr[%d]  %p\n",i,arr[i]);
-        arr[i][0]=1;
-    }
-
-    // printf("arr[0] %p\n",arr[0]);
-
-    // arr[0][0] = 1; // page fault
-    // printf("arr[1] %p\n",arr[1]);
-
-    // arr[1][0] = 1; // page fault
-    // printf("arr[5] %p\n",arr[5]);
-
-    // arr[5][0] = 1; // page fault
-    // printf("arr[8] %p\n",arr[8]);
-    // arr[8][0] = 1; // page fault
-    // printf("arr[10] %p\n",arr[10]);
-    // arr[10][0] = 1; // page fault
-    // printf("arr[13] %p\n",arr[13]);
-    // arr[13][0] = 1; // page fault
-    // printf("finish test!!!!\n");
-   
-
-    exit(status);
-
-    }
-
-
-   
 }
 
 void pageFaultTest(){
-        printf("before alloc 13 pages\n");
 
     char* arr[32];
 
-    for(int i=0;i<13;i++){ //todo check free space in ram
-        arr[i] = sbrk(PGSIZE);
-        printf("arr[i] %p\n",arr[i]);
-
-    }
-    printf("should NOT be pagefulat now\n");
-    printf("arr[0][0]=1\n");
-    arr[0][0] = 1; //page is in ram - no page fault
-    printf("arr[5][0]=1\n");
-    arr[5][0] = 1; //page is in ram - no page fault
-    printf("arr[10][0]=1\n");
-    arr[10][0] = 1; //page is in ram - no page fault
-    printf("before alloc another 13 pages\n");
-
-    for(int j=13;j<26;j++){ //todo check free space in ram
-        arr[j] = sbrk(PGSIZE);
-        printf("write to va %p\n",arr[j]);
-        arr[j][0] = 1;
+    printf("// allocate 20 pages //\n");
+    for(int i = 0; i < 20; i++){
+        arr[i] = sbrk(PAGEZS);
     }
 
-    printf("Should be pagefulat now\n");
-    printf("arr[0] %p\n",arr[0]);
+    printf("// no pagefault in the next 3 prints //\n");
 
-    arr[0][0] = 1; // page fault
-    printf("arr[1] %p\n",arr[1]);
+    for(int i=16; i<19; i++){
+        printf("arr[%d] add : %p\n", i, arr[i]);
+        arr[i][0] = 1;
+    }
+    
+    printf("// pagefault in the next 3 prints //\n");
 
-    arr[1][0] = 1; // page fault
-    printf("arr[5] %p\n",arr[5]);
-
-    arr[5][0] = 1; // page fault
-    printf("arr[8] %p\n",arr[8]);
-    arr[8][0] = 1; // page fault
-    printf("arr[10] %p\n",arr[10]);
-    arr[10][0] = 1; // page fault
-    printf("arr[13] %p\n",arr[13]);
-    arr[13][0] = 1; // page fault
-    printf("finish test!!!!\n");
+    for(int i=0; i<3; i++){
+        printf("arr[%d] add : %p\n", i, arr[i]);
+        arr[i][0] = 1;
+    }
 }
 
 
 
+int
+main(int argc, char *argv[])
+{
+    int test_number = 1;
+    printf("starting test\n");
 
+    // printf("-----test no %d-----\n", test_number);
+    // SanityTest();
+    // test_number++;
 
+    printf("\n-----test no %d-----\n", test_number);
+    forkTest();
+    test_number++;
 
-int main(int argc, char *argv[]){
-
-    // printf("--------- START TESTING! ---------\n");
-
-
-    // printf("------- test%d -------\n", test_no);
-    // very_simple(fork());
-    // test_no++;
-
-    // printf("------- test%d -------\n", test_no);
-    // simple(fork());
-    // test_no++;
-
-    // printf("------- test%d -------\n", test_no);
-    // test_paging(fork(),2);
-    // test_no++;
-
-    // printf("------- test%d -------\n", test_no);
-    // test_paging(fork(),6);
-    // test_no++;
-
-    printf("------- test%d -------\n", test_no);
-    test_paging(fork(),13);
-    test_no++;
-
-    // printf("------- test%d -------\n", test_no);
-    // forkTest();
-    // test_no++;
-
-    // printf("------- test%d -------\n", test_no);
-    // forkTest2();
-    // test_no++;
-
-    printf("------- test%d -------\n", test_no);
+    printf("\n-----test no %d-----\n", test_number);
     pageFaultTest();
-    test_no++;
-    // printf("------- test%d -------\n", test_no);
-    // simpleswapTest();
-    // test_no++;
+    test_number++;
 
-    // TODO: ADD MORE TESTS!!
-
-
-    printf("--------- DONE  TESTING! ---------\n");
+    printf("\nfinished test successfully\n");
     exit(0);
+
 }

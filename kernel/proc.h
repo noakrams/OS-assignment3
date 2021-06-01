@@ -81,6 +81,16 @@ struct trapframe {
 };
 
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
+enum pagemdstate {NONUSED, FILE, MEMORY};
+
+//page meta data
+struct page_md{
+  uint64 va;
+  int offset;
+  uint ctime;
+  int counter;
+  enum pagemdstate stat;
+};
 
 // Per-process state
 struct proc {
@@ -105,6 +115,10 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
-
+  int file_pages [16];
+  struct page_md total_pages [MAX_TOTAL_PAGES];
+  int ramPages;
+  int swapPages;
+  int shFlag;
   struct file *swapFile;
 };

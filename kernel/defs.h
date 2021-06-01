@@ -8,6 +8,7 @@ struct spinlock;
 struct sleeplock;
 struct stat;
 struct superblock;
+struct page_md;
 
 // bio.c
 void            binit(void);
@@ -110,6 +111,14 @@ void            yield(void);
 int             either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
 int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 void            procdump(void);
+void            page_md_free(struct page_md*);
+void            add_page(uint64);
+int             is_place_available(int numToAdd);
+void            swap_out_if_neccessery(void);
+int             find_free_offset(void);
+int             addpage(void); //system call
+struct page_md* find_page_by_va(uint64 va);
+int             pidBiggerThan2(void);
 
 // swtch.S
 void            swtch(struct context*, struct context*);
@@ -180,6 +189,7 @@ uint64          walkaddr(pagetable_t, uint64);
 int             copyout(pagetable_t, uint64, char *, uint64);
 int             copyin(pagetable_t, char *, uint64, uint64);
 int             copyinstr(pagetable_t, char *, uint64, uint64);
+pte_t *         walk(pagetable_t pagetable, uint64 va, int alloc);
 
 // plic.c
 void            plicinit(void);

@@ -176,8 +176,10 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
     if(do_free){
-      uint64 pa = PTE2PA(*pte);
-      kfree((void*)pa);
+
+      // TODO changed from the orginal version
+      page_md_free(find_page_by_va(a));
+      //kfree((void*)pa);
     }
     *pte = 0;
   }
@@ -224,6 +226,15 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
     return oldsz;
 
   oldsz = PGROUNDUP(oldsz);
+
+  #ifndef NONE
+
+    int numToAdd = (PGROUNDUP(newsz) - oldsz) / PGSIZE;
+    if (is_place_available(numToAdd))
+      panic("Not enough space!");
+
+  #endif
+
   for(a = oldsz; a < newsz; a += PGSIZE){
     mem = kalloc();
     if(mem == 0){
@@ -236,6 +247,12 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
       uvmdealloc(pagetable, a, oldsz);
       return 0;
     }
+
+    #ifndef NONE
+      swap_out_if_neccessery();
+      add_page((uint64) a);
+    #endif
+
   }
   return newsz;
 }
@@ -249,6 +266,21 @@ uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 {
   if(newsz >= oldsz)
     return oldsz;
+
+  #ifndef NONE
+    uint64 a;
+    struct page_md* pageToRemove;
+
+    if(pidBiggerThan2()){
+      newsz = PGROUNDDOWN(newsz);
+      for (a = newsz; a < oldsz; a += PGSIZE) {
+        if((pageToRemove = find_page_by_va((uint64)a)) == 0)
+          panic("didn't found the page");
+
+        page_md_free(pageToRemove); 
+      }
+    }
+  #endif
 
   if(PGROUNDUP(newsz) < PGROUNDUP(oldsz)){
     int npages = (PGROUNDUP(oldsz) - PGROUNDUP(newsz)) / PGSIZE;

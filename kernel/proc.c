@@ -17,6 +17,7 @@ struct spinlock pid_lock;
 
 extern void forkret(void);
 static void freeproc(struct proc *p);
+extern int pageToSwapFile();
 
 extern char trampoline[]; // trampoline.S
 
@@ -305,6 +306,40 @@ fork(void)
 
   pid = np->pid;
 
+  #ifndef NONE
+    if(np->pid>2){
+      // can't hold any keys when in function createSwap file
+      release(&np->lock);
+      createSwapFile(np);
+      acquire(&np->lock);
+      for (i = 0; i < MAX_TOTAL_PAGES; i++){
+        np->total_pages[i] = p->total_pages[i];
+      }
+
+      for(int i = 0 ; i < MAX_PSYC_PAGES; i++){
+      np->file_pages[i] = p->file_pages[i];
+      }
+
+      // TODO changed from the original version
+      // char buf[PGSIZE/2];
+      // for (int i = 0; i < MAX_TOTAL_PAGES * PGSIZE; i+=PGSIZE/2){
+      //   readFromSwapFile(p,buf,i,PGSIZE/2);
+      //   writeToSwapFile(np,buf,i,PGSIZE/2);
+      // }
+      char *buf = kalloc();
+      for (int i = 0; i < MAX_TOTAL_PAGES; i++){
+        release(&np->lock);
+        readFromSwapFile(p,buf,i*PGSIZE,PGSIZE);
+        writeToSwapFile(np,buf,i*PGSIZE,PGSIZE);
+        acquire(&np->lock);
+      }
+      kfree((void *)buf);
+    }
+
+    if(p->pid == 2) np->shFlag = 1;
+
+  #endif
+
   release(&np->lock);
 
   acquire(&wait_lock);
@@ -358,6 +393,24 @@ exit(int status)
   end_op();
   p->cwd = 0;
 
+  #ifndef NONE
+    if(p->pid > 2){
+      removeSwapFile(p);
+      for(int i = 0 ; i < MAX_PSYC_PAGES; i++){
+        p->file_pages[i] = 0;
+      }
+    }
+
+    struct page_md *pagemd;
+    for(int i = 0; i< MAX_TOTAL_PAGES; i++){
+      pagemd = &p->total_pages[i];
+      page_md_free(pagemd);
+    }
+
+    p->ramPages = 0;
+    p->swapPages = 0;
+
+  #endif
   acquire(&wait_lock);
 
   // Give any children to init.
@@ -427,6 +480,23 @@ wait(uint64 addr)
   }
 }
 
+void
+update_AGING(){
+  struct proc *p = myproc ();
+  struct page_md *pagemd;
+  for(int i = 0; i< MAX_TOTAL_PAGES; i++){
+    pagemd = &p->total_pages[i];
+    if(pagemd->stat == MEMORY){
+        pte_t *pte = walk(p->pagetable, pagemd->va, 0);
+        int accessed = *pte & PTE_A;
+        accessed<<=1; 
+        pagemd->counter >>= 1;
+        pagemd->counter |= accessed;  //change the last bit of the counter if need to
+        *pte &= ~PTE_A; // clear pte_a
+    }
+  }
+}
+
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
 // Scheduler never returns.  It loops, doing:
@@ -454,7 +524,7 @@ scheduler(void)
         p->state = RUNNING;
         c->proc = p;
         swtch(&c->context, &p->context);
-
+        update_AGING();
         // Process is done running for now.
         // It should have changed its p->state before coming back.
         c->proc = 0;
@@ -653,4 +723,107 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+void
+add_page(uint64 va){
+
+  struct proc *p = myproc();
+
+  if(p->pid <= 2 || p->shFlag)
+    return;
+
+  struct page_md* pagemd;
+  for (int i = 0; i < MAX_TOTAL_PAGES; i++) {
+    pagemd = &p->total_pages[i];
+    if (pagemd->stat == NONUSED) {
+        goto found;
+    }
+  }
+
+  panic("No place for new page\n");
+
+  found:  
+
+  pagemd->stat = MEMORY;
+  pagemd->ctime = ticks;
+  pagemd->va = va;
+  pagemd->offset = 0;
+  pagemd->counter = 0;
+  p->ramPages ++;
+
+  #ifdef LAPA
+  pagemd -> counter = 0xFFFFFFFF;
+  #endif
+}
+
+int
+is_place_available(int numToAdd){
+  struct proc* p = myproc();
+  return p->pid > 2 && p->ramPages + p->swapPages + numToAdd > MAX_TOTAL_PAGES;
+}
+
+void
+swap_out_if_neccessery(){
+  
+  struct proc* p = myproc();
+
+  if(p->pid <= 2 || p->ramPages < MAX_PSYC_PAGES || p->shFlag)
+    return;
+
+  pageToSwapFile();
+
+}
+
+int
+find_free_offset(){
+    struct proc* p = myproc();
+    for(int i = 0 ; i < MAX_PSYC_PAGES ; i++){
+        if(!p->file_pages[i])
+            return i;
+    }
+    return -1;
+}
+
+struct page_md* 
+find_page_by_va(uint64 va){
+  struct proc* p = myproc();
+  for(int i = 0 ; i < MAX_TOTAL_PAGES ; i++){
+    if (p->total_pages[i].va == va) {
+        return &p->total_pages[i];
+      }
+    }
+  return 0;
+}
+
+void
+page_md_free(struct page_md* pagemd){
+
+  struct proc* p = myproc();
+
+  if(pagemd->stat == MEMORY){
+
+    // TODO check which version is better
+
+    pte_t *pte = walk (p->pagetable, pagemd->va, 0);
+    uint64 pa = PTE2PA(*pte);
+    //uint64 pa = walkaddr (p->pagetable, pagemd->va);
+    //if(pa)
+    kfree((void*)pa);
+    p->ramPages--;
+  }
+  if(pagemd->stat == FILE){
+    p->swapPages--;
+  }
+  pagemd->stat = NONUSED;
+  pagemd->ctime = 0;
+  pagemd->va = 0;
+  pagemd->offset = 0;
+  pagemd->counter = 0;
+}
+
+int
+pidBiggerThan2(void){
+  struct proc* p = myproc();
+  return p->pid > 2;
 }

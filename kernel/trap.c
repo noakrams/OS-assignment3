@@ -79,6 +79,7 @@ pageToSwapFile(){
     
     p->file_pages[swapfile_offset] = 1;
 
+    pte_t *pteToRemove = walk(p->pagetable, (uint64)pagemd->va, 0);
     *pteToRemove |= PTE_PG; // in disk
     *pteToRemove &= ~PTE_V; // not valid
 
@@ -144,6 +145,7 @@ pageToSwapFile(){
     
     p->file_pages[swapfile_offset] = 1;
 
+    pte_t *pteToRemove = walk(p->pagetable, (uint64)pagemd->va, 0);
     *pteToRemove |= PTE_PG; // in disk
     *pteToRemove &= ~PTE_V; // not valid
 
@@ -209,6 +211,7 @@ pageToSwapFile(){
     
     p->file_pages[swapfile_offset] = 1;
 
+    pte_t *pteToRemove = walk(p->pagetable, (uint64)pagemd->va, 0);
     *pteToRemove |= PTE_PG; // in disk
     *pteToRemove &= ~PTE_V; // not valid
 

@@ -20,9 +20,11 @@ exec(char *path, char **argv)
   struct proghdr ph;
   pagetable_t pagetable = 0, oldpagetable;
   struct proc *p = myproc();
+
+  #ifndef NONE
   p->shFlag = 0;
 
-  // backup
+  // backup and deleting the current pages
   int backup_file_pages [16];
   for(int i = 0; i<MAX_PSYC_PAGES; i++){
     backup_file_pages[i] = p->file_pages[i];
@@ -31,15 +33,16 @@ exec(char *path, char **argv)
 
   struct page_md backup_total_pages [MAX_TOTAL_PAGES];
   for(int i = 0; i<MAX_TOTAL_PAGES; i++){
-    backup_total_pages[i] = p->total_pages[i];
-    p->total_pages[i].counter = 0;
+    struct page_md *pagemd = &p->total_pages[i];
+    memmove((void *) &backup_total_pages[i], (void *) pagemd, sizeof (struct page_md));
+    pagemd->counter = 0;
     #ifdef LAPA
-    p->total_pages[i].counter = 0xFFFFFFFF;
+    pagemd->counter = 0xFFFFFFFF;
     #endif
-    p->total_pages[i].ctime = 0;
-    p->total_pages[i].offset = 0;
-    p->total_pages[i].stat = NONUSED;
-    p->total_pages[i].va = 0;
+    pagemd->ctime = 0;
+    pagemd->offset = 0;
+    pagemd->stat = NONUSED;
+    pagemd->va = 0;
   }
 
   int backup_ramPages = p->ramPages;
@@ -47,6 +50,7 @@ exec(char *path, char **argv)
   int backup_swapPages = p->swapPages;
   p->swapPages=0;
 
+  #endif
 
   begin_op();
 
@@ -160,17 +164,19 @@ exec(char *path, char **argv)
     end_op();
   }
 
+  #ifndef NONE
   // restore backup
   for(int i = 0; i<MAX_PSYC_PAGES; i++){
     p->file_pages[i] = backup_file_pages[i];
   }
 
   for(int i = 0; i<MAX_TOTAL_PAGES; i++)
-    p->total_pages[i] = backup_total_pages[i] = p->total_pages[i];
+    memmove((void *) &p->total_pages[i], (void *) &backup_total_pages[i], sizeof (struct page_md));
 
   p->ramPages = backup_ramPages;
   p->swapPages = backup_swapPages;
 
+  #endif
   return -1;
 }
 

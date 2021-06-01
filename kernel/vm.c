@@ -178,8 +178,12 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
     if(do_free){
 
       // TODO changed from the orginal version
+      #ifndef NONE
       page_md_free(find_page_by_va(a));
-      //kfree((void*)pa);
+      #else
+      uint64 pa = PTE2PA(*pte);
+      kfree((void*)pa);
+      #endif
     }
     *pte = 0;
   }

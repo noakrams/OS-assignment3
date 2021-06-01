@@ -312,9 +312,8 @@ fork(void)
       release(&np->lock);
       createSwapFile(np);
       acquire(&np->lock);
-      for (i = 0; i < MAX_TOTAL_PAGES; i++){
-        np->total_pages[i] = p->total_pages[i];
-      }
+      for (i = 0; i < MAX_TOTAL_PAGES; i++)
+        memmove((void *) &np->total_pages[i], (void *) &p->total_pages[i], sizeof (struct page_md));
 
       for(int i = 0 ; i < MAX_PSYC_PAGES; i++){
       np->file_pages[i] = p->file_pages[i];
@@ -326,14 +325,17 @@ fork(void)
       //   readFromSwapFile(p,buf,i,PGSIZE/2);
       //   writeToSwapFile(np,buf,i,PGSIZE/2);
       // }
-      char *buf = kalloc();
-      for (int i = 0; i < MAX_TOTAL_PAGES; i++){
-        release(&np->lock);
-        readFromSwapFile(p,buf,i*PGSIZE,PGSIZE);
-        writeToSwapFile(np,buf,i*PGSIZE,PGSIZE);
-        acquire(&np->lock);
+
+      if(np->shFlag){
+        char *buf = kalloc();
+        for (int i = 0; i < MAX_TOTAL_PAGES; i++){
+          release(&np->lock);
+          readFromSwapFile(p,buf,i*PGSIZE,PGSIZE);
+          writeToSwapFile(np,buf,i*PGSIZE,PGSIZE);
+          acquire(&np->lock);
+        }
+        kfree((void *)buf);
       }
-      kfree((void *)buf);
     }
 
     if(p->pid == 2) np->shFlag = 1;
@@ -727,11 +729,12 @@ procdump(void)
 
 void
 add_page(uint64 va){
-
   struct proc *p = myproc();
 
   if(p->pid <= 2 || p->shFlag)
     return;
+    
+  printf("inside add_page with pid %d\n", p->pid);
 
   struct page_md* pagemd;
   for (int i = 0; i < MAX_TOTAL_PAGES; i++) {
@@ -800,16 +803,17 @@ void
 page_md_free(struct page_md* pagemd){
 
   struct proc* p = myproc();
-
+  if(!pagemd)
+    return;
   if(pagemd->stat == MEMORY){
 
     // TODO check which version is better
 
-    pte_t *pte = walk (p->pagetable, pagemd->va, 0);
-    uint64 pa = PTE2PA(*pte);
-    //uint64 pa = walkaddr (p->pagetable, pagemd->va);
-    //if(pa)
-    kfree((void*)pa);
+    //pte_t *pte = walk (p->pagetable, pagemd->va, 0);
+    //uint64 pa = PTE2PA(*pte);
+    uint64 pa = walkaddr (p->pagetable, pagemd->va);
+    if(pa)
+      kfree((void*)pa);
     p->ramPages--;
   }
   if(pagemd->stat == FILE){

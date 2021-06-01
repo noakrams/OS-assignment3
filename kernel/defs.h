@@ -111,16 +111,13 @@ void            yield(void);
 int             either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
 int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 void            procdump(void);
-int             page_md_free(struct page_md*);
+void             page_md_free(struct page_md*);
 void            add_page(uint64);
 int             is_place_available(int numToAdd);
 void            swap_out_if_neccessery(void);
 int             find_free_offset(void);
-int             addpage(void); //system call
 struct page_md* find_page_by_va(uint64 va);
-void            reset_page(struct page_md*);
-int            pidBiggerThan2(void);
-
+int             pidBiggerThan2(void);
 
 // swtch.S
 void            swtch(struct context*, struct context*);

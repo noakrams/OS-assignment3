@@ -96,8 +96,3 @@ sys_uptime(void)
   return xticks;
 }
 
-uint64
-sys_addpage(void)
-{
-  return addpage();
-}

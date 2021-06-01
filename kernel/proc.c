@@ -18,6 +18,7 @@ struct spinlock pid_lock;
 extern void forkret(void);
 extern int pageToSwapFile(void);
 static void freeproc(struct proc *p);
+extern int pageToSwapFile();
 
 extern char trampoline[]; // trampoline.S
 
@@ -309,46 +310,39 @@ fork(void)
   pid = np->pid;
 
   #ifndef NONE
-
-  if(np->pid <= 2){
-    struct page_md* pagemd;
-    for(int i = 0; i < MAX_TOTAL_PAGES; i++){
-      pagemd = &np->total_pages[i];
-      pagemd->stat = NONUSED;
-      pagemd->offset = 0;
-      pagemd->ctime = -1;
-      pagemd->va = -1;
-    }
-  }
-
-  // init and sh don't have swap file
-  else{
-
-    // can't hold any keys when in function createSwap file
-    release(&np->lock);
-    createSwapFile(np);
-    acquire(&np->lock);
-
-    // Deep copy of pages in file and memory
-    for (i = 0; i < MAX_TOTAL_PAGES; i++){ 
+    if(np->pid>2){
+      // can't hold any keys when in function createSwap file
+      release(&np->lock);
+      createSwapFile(np);
+      acquire(&np->lock);
+      for (i = 0; i < MAX_TOTAL_PAGES; i++){
         np->total_pages[i] = p->total_pages[i];
       }
 
-    for(int i = 0 ; i < MAX_PSYC_PAGES; i++){
+      for(int i = 0 ; i < MAX_PSYC_PAGES; i++){
       np->file_pages[i] = p->file_pages[i];
-    }
-
-    release(&np->lock);
-    if(p->pid > 2){
-      char buf[PGSIZE / 2];
-      for(int i = 0; i < (MAX_TOTAL_PAGES - 1) * PGSIZE; i += PGSIZE/2){
-        readFromSwapFile(p,buf,i,PGSIZE/2);
-        writeToSwapFile(np,buf,i,PGSIZE/2);
       }
-    }
-    acquire(&np->lock); 
 
-  }
+      // TODO changed from the original version
+      // char buf[PGSIZE/2];
+      // for (int i = 0; i < MAX_TOTAL_PAGES * PGSIZE; i+=PGSIZE/2){
+      //   readFromSwapFile(p,buf,i,PGSIZE/2);
+      //   writeToSwapFile(np,buf,i,PGSIZE/2);
+      // }
+      if(np->shFlag){
+        char *buf = kalloc();
+        for (int i = 0; i < MAX_TOTAL_PAGES; i++){
+          release(&np->lock);
+          readFromSwapFile(p,buf,i*PGSIZE,PGSIZE);
+          writeToSwapFile(np,buf,i*PGSIZE,PGSIZE);
+          acquire(&np->lock);
+        }
+        kfree((void *)buf);
+        }
+      }
+
+    if(p->pid == 2) np->shFlag = 1;
+
   #endif
 
   release(&np->lock);
@@ -419,21 +413,17 @@ exit(int status)
         p->file_pages[i] = 0;
       }
     }
-  
-  #endif
-  p->ramPages = 0;
-  p->swapPages = 0;
-  struct page_md *pagemd;
-  for(int i = 0; i< MAX_TOTAL_PAGES; i++){
-    pagemd = &p->total_pages[i];
-    page_md_free(pagemd);
-    pagemd->counter = 0;
-    pagemd->ctime=0;
-    pagemd->offset=0;
-    pagemd->va=0;
-    pagemd->stat=NONUSED;
-  }
 
+    struct page_md *pagemd;
+    for(int i = 0; i< MAX_TOTAL_PAGES; i++){
+      pagemd = &p->total_pages[i];
+      page_md_free(pagemd);
+    }
+
+    p->ramPages = 0;
+    p->swapPages = 0;
+
+  #endif
   acquire(&wait_lock);
 
   // Give any children to init.
@@ -545,7 +535,7 @@ scheduler(void)
         p->state = RUNNING;
         c->proc = p;
         swtch(&c->context, &p->context);
-
+        update_AGING();
         // Process is done running for now.
         // It should have changed its p->state before coming back.
         #ifndef NONE
@@ -749,31 +739,10 @@ procdump(void)
   }
 }
 
-int page_md_free(struct page_md* pagemd){
-    if(pagemd == 0)
-        return -1;
-    if(pagemd->stat == MEMORY){
-        pte_t* pte = walk(myproc()->pagetable, pagemd->va, 0);
-        if(pte == 0){ 
-           panic("pte is 0 in page_md_free");
-          }
-        // if page is in memory - set it free
-        if ((*pte & PTE_V)) {
-            uint64 pa = PTE2PA(*pte);
-            if (pa == 0)
-                panic("page_md_free");
-            pagemd->stat = NONUSED;
-            pagemd->ctime = -1;
-            pagemd->va = -1;
-            kfree((void*)pa);
-            return 1;
-        }
-    }
-    return -1;
-}
 
 void
 add_page(uint64 va){
+
   struct proc *p = myproc();
 
   if(p->pid <= 2 || p->shFlag)
@@ -787,9 +756,9 @@ add_page(uint64 va){
     }
   }
 
-  panic("Can't find NONUSED page in add_page\n");
+  panic("No place for new page\n");
 
-  found:
+  found:  
 
   pagemd->stat = MEMORY;
   pagemd->ctime = ticks;
@@ -831,12 +800,6 @@ find_free_offset(){
     return -1;
 }
 
-
-int
-addpage(void){
-  return 1;
-}
-
 struct page_md* 
 find_page_by_va(uint64 va){
   struct proc* p = myproc();
@@ -849,17 +812,29 @@ find_page_by_va(uint64 va){
 }
 
 void
-reset_page(struct page_md* page){
+page_md_free(struct page_md* pagemd){
+
   struct proc* p = myproc();
-  if (page->stat == MEMORY) {
-      p->ramPages--;
+
+  if(pagemd->stat == MEMORY){
+
+    // TODO check which version is better
+
+    pte_t *pte = walk (p->pagetable, pagemd->va, 0);
+    uint64 pa = PTE2PA(*pte);
+    //uint64 pa = walkaddr (p->pagetable, pagemd->va);
+    //if(pa)
+    kfree((void*)pa);
+    p->ramPages--;
   }
-  if (page->stat == FILE) {
-      p->swapPages--;
+  if(pagemd->stat == FILE){
+    p->swapPages--;
   }
-  page->stat = NONUSED;
-  page->ctime = -1;
-  page->offset = -1;
+  pagemd->stat = NONUSED;
+  pagemd->ctime = 0;
+  pagemd->va = 0;
+  pagemd->offset = 0;
+  pagemd->counter = 0;
 }
 
 int

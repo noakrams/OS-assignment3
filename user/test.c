@@ -4,6 +4,36 @@
 
 #define PAGEZS 4096
 
+
+void simpleTest(){
+   char* arr[32];
+   arr[0] = 0;
+   arr[1] = 0;
+   arr[2] = 0;
+
+    // for(int i = 0; i < 5; i++){
+    //     arr[i] = sbrk(PAGEZS);
+    // }
+    for(int i=0; i<2; i++){
+        printf("arr[%d] add : %p\n", i, arr[i]);
+        arr[i][0] = 1;
+    }
+}
+
+void simpleFork(){
+
+    int pid = fork();
+    int status;
+
+    if (!pid){
+        exit(0);
+    }
+    else{
+        wait(&status);
+    }
+}
+
+
 void SanityTest(){
 
     char* arr[32];
@@ -158,8 +188,6 @@ void pageFaultTest(){
     }
 }
 
-
-
 int
 main(int argc, char *argv[])
 {
@@ -167,16 +195,26 @@ main(int argc, char *argv[])
     printf("starting test\n");
 
     // printf("-----test no %d-----\n", test_number);
+    // simpleTest();
+    // test_number++;
+
+    // printf("-----test no %d-----\n", test_number);
+    // simpleFork();
+    // test_number++;
+
+    // printf("-----test no %d-----\n", test_number);
     // SanityTest();
     // test_number++;
 
-    printf("\n-----test no %d-----\n", test_number);
-    forkTest();
-    test_number++;
+
+    // printf("\n-----test no %d-----\n", test_number);
+    // forkTest();
+    // test_number++;
 
     printf("\n-----test no %d-----\n", test_number);
     pageFaultTest();
     test_number++;
+
 
     printf("\nfinished test successfully\n");
     exit(0);

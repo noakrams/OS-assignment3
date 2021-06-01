@@ -22,6 +22,33 @@ exec(char *path, char **argv)
   struct proc *p = myproc();
   p->shFlag = 0;
 
+
+  // backup
+  int backup_file_pages [16];
+  for(int i = 0; i<MAX_PSYC_PAGES; i++){
+    backup_file_pages[i] = p->file_pages[i];
+    p->file_pages[i] = 0;
+  }
+
+  struct page_md backup_total_pages [MAX_TOTAL_PAGES];
+  for(int i = 0; i<MAX_TOTAL_PAGES; i++){
+    backup_total_pages[i] = p->total_pages[i];
+    p->total_pages[i].counter = 0;
+    #ifdef LAPA
+    p->total_pages[i].counter = 0xFFFFFFFF;
+    #endif
+    p->total_pages[i].ctime = 0;
+    p->total_pages[i].offset = 0;
+    p->total_pages[i].stat = NONUSED;
+    p->total_pages[i].va = 0;
+  }
+
+  int backup_ramPages = p->ramPages;
+  p->ramPages=0;
+  int backup_swapPages = p->swapPages;
+  p->swapPages=0;
+
+
   begin_op();
 
   if((ip = namei(path)) == 0){
@@ -110,16 +137,7 @@ exec(char *path, char **argv)
   safestrcpy(p->name, last, sizeof(p->name));
 
   #ifndef NONE
-    struct page_md *pagemd;
     if(p->pid > 2){
-      
-      for(int i = 0 ; i< MAX_TOTAL_PAGES; i++){
-          pagemd = &p->total_pages[i];
-          pagemd -> stat = NONUSED;
-          pagemd -> va = -1;
-      }
-      p->ramPages = 0;
-      p->swapPages = 0;
       removeSwapFile(p);
       createSwapFile(p);
     }
@@ -143,6 +161,18 @@ exec(char *path, char **argv)
     iunlockput(ip);
     end_op();
   }
+
+  // restore backup
+  for(int i = 0; i<MAX_PSYC_PAGES; i++){
+    p->file_pages[i] = backup_file_pages[i];
+  }
+
+  for(int i = 0; i<MAX_TOTAL_PAGES; i++)
+    p->total_pages[i] = backup_total_pages[i] = p->total_pages[i];
+
+  p->ramPages = backup_ramPages;
+  p->swapPages = backup_swapPages;
+
   return -1;
 }
 

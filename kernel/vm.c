@@ -176,8 +176,14 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
     if(do_free){
+
+      // TODO changed from the orginal version
+      #ifndef NONE
+      page_md_free(find_page_by_va(a));
+      #else
       uint64 pa = PTE2PA(*pte);
       kfree((void*)pa);
+      #endif
     }
     *pte = 0;
   }
@@ -224,15 +230,15 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
     return oldsz;
 
   oldsz = PGROUNDUP(oldsz);
+
   #ifndef NONE
 
-  int numToAdd = (PGROUNDUP(newsz) - oldsz) / PGSIZE;
-  
-  if (is_place_available(numToAdd))
-        panic("Not enough space!");
+    int numToAdd = (PGROUNDUP(newsz) - oldsz) / PGSIZE;
+    if (is_place_available(numToAdd))
+      panic("Not enough space!");
 
-  
   #endif
+
   for(a = oldsz; a < newsz; a += PGSIZE){
     mem = kalloc();
     if(mem == 0){
@@ -245,11 +251,13 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
       uvmdealloc(pagetable, a, oldsz);
       return 0;
     }
-    #ifndef NONE
 
-    swap_out_if_neccessery();
-    add_page((uint64) a);
+
+    #ifndef NONE
+      swap_out_if_neccessery();
+      add_page((uint64) a);
     #endif
+
   }
   return newsz;
 }
@@ -266,28 +274,20 @@ uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
     return oldsz;
 
   #ifndef NONE
-  pte_t *pte;
-  uint a;
-  struct page_md* pageToRemove;
+    uint64 a;
+    struct page_md* pageToRemove;
 
-  a = PGROUNDUP(newsz);
-  
-  if(pidBiggerThan2()){
-    for (; a < oldsz; a += PGSIZE) {
-        pte = walk(pagetable, (uint64)a, 0);
+    if(pidBiggerThan2()){
+      newsz = PGROUNDDOWN(newsz);
+      for (a = newsz; a < oldsz; a += PGSIZE) {
+        if((pageToRemove = find_page_by_va((uint64)a)) == 0)
+          panic("didn't found the page");
 
-        if (!pte) 
-            a += (1024 - 1) * PGSIZE; // 1024 pte in a pagetable
-
-        pageToRemove = find_page_by_va((uint64)a);
-        // reset page
-        reset_page(pageToRemove);
-        // free 
-        page_md_free(pageToRemove);
+        page_md_free(pageToRemove); 
+      }
     }
-  }
-
   #endif
+
   if(PGROUNDUP(newsz) < PGROUNDUP(oldsz)){
     int npages = (PGROUNDUP(oldsz) - PGROUNDUP(newsz)) / PGSIZE;
     uvmunmap(pagetable, PGROUNDUP(newsz), npages, 1);

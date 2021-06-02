@@ -315,8 +315,16 @@ fork(void)
       release(&np->lock);
       createSwapFile(np);
       acquire(&np->lock);
-      for (i = 0; i < MAX_TOTAL_PAGES; i++)
+
+      if(p->pid > 2){
+      for (i = 0; i < MAX_TOTAL_PAGES; i++){
+        //struct page_md *pagemd = &p->total_pages[i];
+        //uint64 pa = walkaddr (p->pagetable, pagemd->va);
+        //uint64 pa2 = walkaddr (np->pagetable, pagemd->va);
+        //printf("fork: p->pid %d, va %p, pa %p\n", p->pid, pagemd->va, pa);
+        //printf("fork: p->pid %d, va %p, pa %p\n", np->pid, pagemd->va, pa2);
         memmove((void *) &np->total_pages[i], (void *) &p->total_pages[i], sizeof (struct page_md));
+      }
 
       for(int i = 0 ; i < MAX_PSYC_PAGES; i++){
       np->file_pages[i] = p->file_pages[i];
@@ -324,27 +332,27 @@ fork(void)
 
       np->ramPages = p->ramPages;
       np->swapPages = p->swapPages;
-
+      
       // TODO changed from the original version
       // char buf[PGSIZE/2];
       // for (int i = 0; i < MAX_TOTAL_PAGES * PGSIZE; i+=PGSIZE/2){
       //   readFromSwapFile(p,buf,i,PGSIZE/2);
       //   writeToSwapFile(np,buf,i,PGSIZE/2);
       // }
-
-      if(p->pid != 2){
-        char *buf = kalloc();
-        for (int i = 0; i < MAX_TOTAL_PAGES; i++){
-          release(&np->lock);
-          readFromSwapFile(p,buf,i*PGSIZE,PGSIZE);
-          writeToSwapFile(np,buf,i*PGSIZE,PGSIZE);
-          acquire(&np->lock);
-        }
-        kfree((void *)buf);
+      
+      char *buf = kalloc();
+      for (int i = 0; i < MAX_TOTAL_PAGES; i++){
+        release(&np->lock);
+        readFromSwapFile(p,buf,i*PGSIZE,PGSIZE);
+        writeToSwapFile(np,buf,i*PGSIZE,PGSIZE);
+        acquire(&np->lock);
+      }
+      kfree((void *)buf);
       }
     }
 
-    if(p->pid == 2) np->shFlag = 1;
+    if(p->pid == 2)
+      np->shFlag = 1;
 
   #endif
 
@@ -383,7 +391,6 @@ void
 exit(int status)
 {
   struct proc *p = myproc();
-  printf("inside exit, pid %d, p->ram: %d, p->swap: %d\n", p->pid, p->ramPages,p->swapPages);
   if(p == initproc)
     panic("init exiting");
 
@@ -433,7 +440,6 @@ exit(int status)
   p->state = ZOMBIE;
 
   release(&wait_lock);
-  printf("finish exit\n");
   // Jump into the scheduler, never to return.
   sched();
   panic("zombie exit");
@@ -734,17 +740,18 @@ procdump(void)
 }
 
 void
-add_page(uint64 va){
+add_page(uint64 va, pagetable_t pagetable){
   struct proc *p = myproc();
-
-  if(p->pid <= 2 || p->shFlag)
+  pte_t *pte1 = walk(p->pagetable, va, 0);
+  if(p->pid <= 2 || p->shFlag || !(*pte1&PTE_U) || p->pagetable != pagetable)
     return;
 
   struct page_md* pagemd;
   for (int i = 0; i < MAX_TOTAL_PAGES; i++) {
     pagemd = &p->total_pages[i];
     if (pagemd->stat == NONUSED) {
-        printf("add page, pid %d , page %d\n", p->pid, i);
+        uint64 pa = walkaddr(p->pagetable, va);
+        printf("add page, pid %d , page %d, pa %p, va %p\n", p->pid, i, pa, va);
         goto found;
     }
   }
@@ -756,10 +763,12 @@ add_page(uint64 va){
   pagemd->stat = MEMORY;
   pagemd->ctime = ticks;
   pagemd->va = va;
-  pagemd->offset = 0;
+  pagemd->offset = -1;
   pagemd->counter = 0;
   p->ramPages ++;
-
+  pte_t *pte = walk(p->pagetable, va, 0);
+  *pte |= PTE_V;
+  *pte &= ~ PTE_PG;
   #ifdef LAPA
   pagemd -> counter = 0xFFFFFFFF;
   #endif
@@ -796,7 +805,8 @@ struct page_md*
 find_page_by_va(uint64 va){
   struct proc* p = myproc();
   for(int i = 0 ; i < MAX_TOTAL_PAGES ; i++){
-    if (p->total_pages[i].va == va) {
+    struct page_md *pagemd = &p->total_pages[i];
+    if (pagemd->va == va) {
         return &p->total_pages[i];
       }
     }
@@ -811,17 +821,13 @@ page_md_free(struct page_md* pagemd){
     return;
 
   if(pagemd->stat == MEMORY){
-  printf("free page, pid %d, p->ram %d, p->swap %d\n", p->pid, p->ramPages, p->swapPages);  
+  uint64 pa = walkaddr(p->pagetable, pagemd->va);
+  pte_t * pte = walk (p->pagetable, pagemd->va, 0);
+  if(!(*pte&PTE_U))
+    return;
+  //printf("free page, pid %d, p->ram %d, p->swap %d pa %p, , va %p\n", p->pid, p->ramPages, p->swapPages, pa, pagemd->va);  
 
     // TODO check which version is better
-    //printf("send page to uvmunmap\n");
-    //uvmunmap(p->pagetable, pagemd->va,1,1);
-    pte_t *pte;
-    if((pte = walk(p->pagetable, pagemd->va, 0)) == 0)
-       panic("page_md_free: walk");
-    uint64 pa = PTE2PA(*pte);
-    //uint64 pa = walkaddr (p->pagetable, pagemd->va);
-    //if(pa)
     kfree((void*)pa);
     p->ramPages--;
   }
@@ -830,26 +836,35 @@ page_md_free(struct page_md* pagemd){
   }
   pagemd->stat = NONUSED;
   pagemd->ctime = 0;
-  pagemd->va = 0;
-  pagemd->offset = 0;
+  pagemd->va = -1;
+  pagemd->offset = -1;
   pagemd->counter = 0;
 }
 
 void
 page_md_free2(uint64 pa, uint64 a, pagetable_t pagetable){
-  kfree((void*)pa);
-  struct proc *p = myproc();
-  // if(p->pagetable!=pagetable)
-  //   return;
+  struct proc* p = myproc();
+  if(p->pagetable!=pagetable)
+    return;
+  kfree((void*)pa);  
+
+  if(p->pid<=2 && !p->shFlag)
+    return;
+
+  pte_t *pte = walk (pagetable, a, 0);
+  if(!(*pte&PTE_U))
+    return;
+
+
   for (int i = 0 ; i < MAX_TOTAL_PAGES; i++){
     struct page_md *pagemd = &p->total_pages[i];
     if(pagemd->stat!= NONUSED && pagemd->va == a){
-      printf("free2 page %d, pid%d\n", i, p->pid);
+      //printf("free2 page %d, pid%d, pa %p, va %p\n", i, p->pid, pa, a);
       p->ramPages--;
       pagemd->stat = NONUSED;
       pagemd->ctime = 0;
-      pagemd->va = 0;
-      pagemd->offset = 0;
+      pagemd->va = -1;
+      pagemd->offset = -1;
       pagemd->counter = 0;
       break;
     }

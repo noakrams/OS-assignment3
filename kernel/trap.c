@@ -61,11 +61,13 @@ pageToSwapFile(){
     int min_page=-1;
     for(int i = 0; i< MAX_TOTAL_PAGES; i++){
       pagemd = &p->total_pages[i];
-      pte_t *tmpPTE = walk(p->pagetable, (uint64)pagemd->va, 0);
-      if(pagemd->stat == MEMORY && (*tmpPTE&PTE_U)){
-        if(pagemd->counter <= min_value){
-          min_value = pagemd->counter;
-          min_page = i;
+      if(pagemd->stat == MEMORY){
+        pte_t *tmpPTE = walk(p->pagetable, pagemd->va, 0);
+        if((*tmpPTE&PTE_U)){
+          if(pagemd->counter <= min_value){
+            min_value = pagemd->counter;
+            min_page = i;
+          }
         }
       }
     }
@@ -77,12 +79,12 @@ pageToSwapFile(){
       panic ("didn't find free offset\n");
 
     // move the page to file
-    printf("move page with va %p to swap\n", pagemd->va);
     pagemd = &p->total_pages[min_page];
     pagemd -> offset = swapfile_offset * PGSIZE;
     pagemd -> counter = 0;
     pagemd -> stat = FILE;
     pagemd -> ctime = 0;
+    printf("ram -> swap : va %p, offset %d\n", pagemd->va, swapfile_offset);
 
     uint64 pa = walkaddr(p->pagetable, pagemd->va);
 
@@ -120,18 +122,20 @@ pageToSwapFile(){
     int min_page=-1;
     for(int i = 0; i< MAX_TOTAL_PAGES; i++){
       pagemd = &p->total_pages[i];
-      pte_t *tmpPTE = walk(p->pagetable, (uint64)pagemd->va, 0);
-      if(pagemd->stat == MEMORY && (*tmpPTE&PTE_U)){
-        int count = countBits(pagemd->counter);
-        if(count < min_number_of_1){
-          min_number_of_1 = count;
-          min_value = pagemd->counter;
-          min_page = i;
-        }
-        else if (count == min_number_of_1){
-          if(pagemd->counter < min_value){
+      if(pagemd->stat == MEMORY){
+        pte_t *tmpPTE = walk(p->pagetable, (uint64)pagemd->va, 0);
+        if((*tmpPTE&PTE_U)){
+            int count = countBits(pagemd->counter);
+          if(count <= min_number_of_1){
+            min_number_of_1 = count;
             min_value = pagemd->counter;
             min_page = i;
+          }
+          else if (count == min_number_of_1){
+            if(pagemd->counter <= min_value){
+              min_value = pagemd->counter;
+              min_page = i;
+            }
           }
         }
       }
@@ -187,11 +191,13 @@ pageToSwapFile(){
       place = -1;
       for(int i = 0; i< MAX_TOTAL_PAGES; i++){
         pagemd = &p->total_pages[i];
-        pte_t *tmpPTE = walk(p->pagetable, (uint64)pagemd->va, 0);
-        if(pagemd->stat == MEMORY && (*tmpPTE&PTE_U)){
-          if (ctime == -1 || pagemd->ctime < ctime){
-            ctime = pagemd->ctime;
-            place = i;
+        if(pagemd->stat == MEMORY){
+          pte_t *tmpPTE = walk(p->pagetable, (uint64)pagemd->va, 0);
+          if((*tmpPTE&PTE_U)){
+            if (ctime == -1 || pagemd->ctime <= ctime){
+              ctime = pagemd->ctime;
+              place = i;
+            }
           }
         }
       }
@@ -307,10 +313,11 @@ usertrap(void)
 
         found:
 
-        printf("Page fault, read page from swapfile, va %p\n", va);
-
+        //printf("Page fault, read page from swapfile, va %p\n", va);
         // Read data from swap file to the virtual address of the page
+        printf("swap -> ram : va %p, offset %d, pa %p\n", currPage->va, currPage->offset/PGSIZE, (uint64) PTE2PA(*pte));
         uint64 pa = PTE2PA(*pte);
+        //printf("currPage->offset %d, pa %p\n", (currPage->offset/PGSIZE));
         if(readFromSwapFile(p, (char*)pa, currPage->offset, PGSIZE) == -1)
           panic("can't read from swap file");
 
@@ -324,10 +331,10 @@ usertrap(void)
         *pte &= ~PTE_PG; // Turn off swap bit
         *pte |= PTE_V; // Turn on valid bit
 
-        currPage->offset = 0;
+        currPage->offset = -1;
         currPage->stat = MEMORY;
         currPage->ctime = ticks;
-        p->file_pages[currPage->offset/PGSIZE] = 0;
+        //p->file_pages[currPage->offset/PGSIZE] = 0;
 
         p->swapPages--;
         p->ramPages++;

@@ -20,26 +20,40 @@ exec(char *path, char **argv)
   struct proghdr ph;
   pagetable_t pagetable = 0, oldpagetable;
   struct proc *p = myproc();
-  p->shFlag = 0;
 
   #ifndef NONE
-    if(p->pid>2){
-      for(int i = 0; i< MAX_TOTAL_PAGES; i++){
-        struct page_md *pagemd = &p->total_pages[i];
-        pagemd->stat = NONUSED;
-        pagemd->va = -1;
-        pagemd->offset = -1;
-        pagemd->counter = 0;
-        pagemd->ctime = 0;
-      }
 
-      for(int i = 0; i< MAX_PSYC_PAGES; i++)
-        p->file_pages[i] = 0;
-
-      p->ramPages = 0;
-      p->swapPages = 0;
-      
+  int backup_file_pages [16];
+  struct page_md backup_total_pages [MAX_TOTAL_PAGES];
+  int backup_ramPages = 0;
+  int backup_swapPages = 0;
+  if(p->pid > 2){
+    p->shFlag = 0;
+    // backup and deleting the current pages
+    
+    for(int i = 0; i<MAX_PSYC_PAGES; i++){
+      backup_file_pages[i] = p->file_pages[i];
+      p->file_pages[i] = 0;
     }
+
+    for(int i = 0; i<MAX_TOTAL_PAGES; i++){
+      struct page_md *pagemd = &p->total_pages[i];
+      memmove((void *) &backup_total_pages[i], (void *) pagemd, sizeof (struct page_md));
+      pagemd->counter = 0;
+      #ifdef LAPA
+      pagemd->counter = 0xFFFFFFFF;
+      #endif
+      pagemd->ctime = 0;
+      pagemd->offset = -1;
+      pagemd->stat = NONUSED;
+      pagemd->va = -1;
+    }
+
+    backup_ramPages = p->ramPages;
+    p->ramPages=0;
+    backup_swapPages = p->swapPages;
+    p->swapPages=0;
+  }
   #endif
 
   begin_op();
@@ -129,6 +143,13 @@ exec(char *path, char **argv)
       last = s+1;
   safestrcpy(p->name, last, sizeof(p->name));
 
+  #ifndef NONE
+    if(p->pid > 2){
+      removeSwapFile(p);
+      createSwapFile(p);
+    }
+  #endif
+
   // Commit to the user image.
   oldpagetable = p->pagetable;
   p->pagetable = pagetable;
@@ -136,21 +157,6 @@ exec(char *path, char **argv)
   p->trapframe->epc = elf.entry;  // initial program counter = main
   p->trapframe->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
-
-  #ifndef NONE
-    if(p->pid > 2){
-
-      //int num_of_pages = sz/PGSIZE;
-      for(int i = 0; i< sz; i+=PGSIZE){
-        printf("adding page\n");
-        add_page(i, pagetable);
-      }
-
-      removeSwapFile(p);
-      createSwapFile(p);
-    }
-  #endif
-
 
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
@@ -162,6 +168,21 @@ exec(char *path, char **argv)
     end_op();
   }
 
+  #ifndef NONE
+
+  if(p->pid > 2){
+    // restore backup
+    for(int i = 0; i<MAX_PSYC_PAGES; i++){
+      p->file_pages[i] = backup_file_pages[i];
+    }
+
+    for(int i = 0; i<MAX_TOTAL_PAGES; i++)
+      memmove((void *) &p->total_pages[i], (void *) &backup_total_pages[i], sizeof (struct page_md));
+
+    p->ramPages = backup_ramPages;
+    p->swapPages = backup_swapPages;
+  }
+  #endif
   return -1;
 }
 

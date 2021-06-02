@@ -180,7 +180,7 @@ void pageFaultTest(){
         printf("arr[%d] add : %p\n", i, arr[i]);
         arr[i][0] = 1;
     }
-    
+   
     printf("// pagefault in the next 3 prints //\n");
 
     for(int i=0; i<3; i++){
@@ -195,9 +195,9 @@ main(int argc, char *argv[])
     int test_number = 1;
     printf("starting test\n");
 
-    printf("-----test no %d-----\n", test_number);
-    simpleTest();
-    test_number++;
+    // printf("-----test no %d-----\n", test_number);
+    // simpleTest();
+    // test_number++;
 
     // printf("-----test no %d-----\n", test_number);
     // simpleFork();
@@ -211,9 +211,9 @@ main(int argc, char *argv[])
     // forkTest();
     // test_number++;
 
-    // printf("\n-----test no %d-----\n", test_number);
-    // pageFaultTest();
-    // test_number++;
+    printf("\n-----test no %d-----\n", test_number);
+    pageFaultTest();
+    test_number++;
 
     printf("\nfinished test successfully\n");
     exit(0);

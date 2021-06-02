@@ -139,7 +139,7 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
 {
   uint64 a, last;
   pte_t *pte;
-
+  //printf("inside mappages - va %p to pa %p\n", va, pa);
   a = PGROUNDDOWN(va);
   last = PGROUNDDOWN(va + size - 1);
   for(;;){
@@ -175,15 +175,13 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
       panic("uvmunmap: not mapped");
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
-    if(do_free){
+    if(do_free && !(*pte & PTE_PG)){
       //printf("inside uvmunmap\n");
 
       // TODO changed from the orginal version
       #ifndef NONE
       uint64 pa = PTE2PA(*pte);
-      kfree((void*)pa);
-      //page_md_free2(pa, a, pagetable);
-      //page_md_free(find_page_by_va(a));
+      page_md_free2(pa, a, pagetable);
       #else
       uint64 pa = PTE2PA(*pte);
       kfree((void*)pa);
@@ -259,7 +257,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 
     #ifndef NONE
       swap_out_if_neccessery();
-      add_page((uint64) a);
+      add_page((uint64) a, pagetable);
     #endif
 
   }

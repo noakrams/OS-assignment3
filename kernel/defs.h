@@ -113,7 +113,7 @@ int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 void            procdump(void);
 void            page_md_free(struct page_md*);
 void            page_md_free2(uint64, uint64, pagetable_t);
-void            add_page(uint64);
+void            add_page(uint64, pagetable_t);
 int             is_place_available(int numToAdd);
 void            swap_out_if_neccessery(void);
 int             find_free_offset(void);

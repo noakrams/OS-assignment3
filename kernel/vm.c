@@ -171,15 +171,19 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
   for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
     if((pte = walk(pagetable, a, 0)) == 0)
       panic("uvmunmap: walk");
-    if((*pte & PTE_V) == 0)
+    if(((*pte & PTE_V) == 0)  && ((*pte & PTE_PG)==0))
       panic("uvmunmap: not mapped");
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
     if(do_free){
+      //printf("inside uvmunmap\n");
 
       // TODO changed from the orginal version
       #ifndef NONE
-      page_md_free(find_page_by_va(a));
+      uint64 pa = PTE2PA(*pte);
+      kfree((void*)pa);
+      //page_md_free2(pa, a, pagetable);
+      //page_md_free(find_page_by_va(a));
       #else
       uint64 pa = PTE2PA(*pte);
       kfree((void*)pa);
@@ -242,6 +246,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
   for(a = oldsz; a < newsz; a += PGSIZE){
     mem = kalloc();
     if(mem == 0){
+      printf("kalloc return 0\n");
       uvmdealloc(pagetable, a, oldsz);
       return 0;
     }
@@ -274,13 +279,13 @@ uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
   #ifndef NONE
     uint64 a;
     struct page_md* pageToRemove;
+    printf("inside uvmdealloc\n");
 
     if(pidBiggerThan2()){
       newsz = PGROUNDDOWN(newsz);
       for (a = newsz; a < oldsz; a += PGSIZE) {
         if((pageToRemove = find_page_by_va((uint64)a)) == 0)
           panic("didn't found the page");
-
         page_md_free(pageToRemove); 
       }
     }

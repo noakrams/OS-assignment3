@@ -112,6 +112,7 @@ int             either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
 int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 void            procdump(void);
 void            page_md_free(struct page_md*);
+void            page_md_free2(uint64, uint64, pagetable_t);
 void            add_page(uint64);
 int             is_place_available(int numToAdd);
 void            swap_out_if_neccessery(void);

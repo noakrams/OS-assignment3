@@ -23,7 +23,6 @@ exec(char *path, char **argv)
 
   #ifndef NONE
   p->shFlag = 0;
-
   // backup and deleting the current pages
   int backup_file_pages [16];
   for(int i = 0; i<MAX_PSYC_PAGES; i++){

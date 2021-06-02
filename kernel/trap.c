@@ -29,6 +29,21 @@ trapinithart(void)
   w_stvec((uint64)kernelvec);
 }
 
+// count the number of bits in a num
+int
+countBits(int num){
+  int count = 0;
+  int i = 0;
+
+  while(i<32){
+    count += num & 1;
+    num >>= 1;
+    i++;
+  }
+
+  return count;
+}
+
 int
 pageToSwapFile(){
 
@@ -48,7 +63,7 @@ pageToSwapFile(){
       pagemd = &p->total_pages[i];
       pte_t *tmpPTE = walk(p->pagetable, (uint64)pagemd->va, 0);
       if(pagemd->stat == MEMORY && (*tmpPTE&PTE_U)){
-        if(pagemd->counter < min_value){
+        if(pagemd->counter <= min_value){
           min_value = pagemd->counter;
           min_page = i;
         }
@@ -62,6 +77,7 @@ pageToSwapFile(){
       panic ("didn't find free offset\n");
 
     // move the page to file
+    printf("move page with va %p to swap\n", pagemd->va);
     pagemd = &p->total_pages[min_page];
     pagemd -> offset = swapfile_offset * PGSIZE;
     pagemd -> counter = 0;
@@ -194,7 +210,7 @@ pageToSwapFile(){
       panic ("didn't find free offset\n");
 
     // move the page to file
-    pagemd = &p->total_pages[min_page];
+    pagemd = &p->total_pages[place];
     pagemd -> offset = swapfile_offset * PGSIZE;
     pagemd -> counter = 0;
     pagemd -> stat = FILE;
@@ -291,28 +307,28 @@ usertrap(void)
 
         found:
 
-        printf("Page fault, read page from swapfile\n");
+        printf("Page fault, read page from swapfile, va %p\n", va);
 
         // Read data from swap file to the virtual address of the page
         uint64 pa = PTE2PA(*pte);
         if(readFromSwapFile(p, (char*)pa, currPage->offset, PGSIZE) == -1)
           panic("can't read from swap file");
 
-          // refresh TLB
-        // sfence_vma();
-        *pte &= ~PTE_PG; // Turn off swap bit
-        *pte |= PTE_V; // Turn on valid bit
-
-        // Update process and current page
-        currPage->offset = 0;
-        currPage->stat = MEMORY;
-        currPage->ctime = ticks;
-        p->file_pages[currPage->offset/PGSIZE] = 0;
 
         p->file_pages[currPage->offset / PGSIZE] = 0;
         if (p->ramPages == MAX_PSYC_PAGES)
           pageToSwapFile();
         
+        // Update process and current page
+
+        *pte &= ~PTE_PG; // Turn off swap bit
+        *pte |= PTE_V; // Turn on valid bit
+
+        currPage->offset = 0;
+        currPage->stat = MEMORY;
+        currPage->ctime = ticks;
+        p->file_pages[currPage->offset/PGSIZE] = 0;
+
         p->swapPages--;
         p->ramPages++;
 

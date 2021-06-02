@@ -6,13 +6,14 @@
 
 void simpleTest(){
    char* arr[32];
-   arr[0] = 0;
-   arr[1] = 0;
-   arr[2] = 0;
+//    arr[0] = 0;
+//    arr[1] = 0;
+//    arr[2] = 0;
 
-    // for(int i = 0; i < 5; i++){
-    //     arr[i] = sbrk(PAGEZS);
-    // }
+    for(int i = 0; i < 5; i++){
+        arr[i] = sbrk(PAGEZS);
+    }
+
     for(int i=0; i<2; i++){
         printf("arr[%d] add : %p\n", i, arr[i]);
         arr[i][0] = 1;
@@ -47,67 +48,68 @@ void SanityTest(){
     int pid = fork();
    
     if(pid == 0){
-        // printf("// iniside child //\n");
-        // printf("// allocate another 15 pages for child //\n");
+        printf("// iniside child //\n");
+        printf("// allocate another 15 pages for child //\n");
 
-        // for(int i = 5; i < 20; i++){
-        //     arr[i] = sbrk(PAGEZS);
-        // }
+        for(int i = 5; i < 20; i++){
+            arr[i] = sbrk(PAGEZS);
+        }
 
-        // sleep(10);
+        sleep(10);
 
-        // printf("// no pagefault in the next 3 prints //\n");
+        printf("// no pagefault in the next 3 prints //\n");
 
-        // for(int i=16; i<19; i++){
-        //     printf("arr[%d] add : %p\n", i, arr[i]);
-        //     arr[i][0] = 1;
-        // }
+        for(int i=16; i<19; i++){
+            printf("arr[%d] add : %p\n", i, arr[i]);
+            arr[i][0] = 1;
+        }
 
-        // printf("// pagefault in the next 3 prints //\n");
+        printf("// pagefault in the next 3 prints //\n");
 
         for(int i=1; i<4; i++){
             printf("arr[%d] add : %p\n", i, arr[i]);
             arr[i][0] = 1;
         }
 
-        // printf("// child finish his job for today //\n");
+        printf("// child finish his job for today //\n");
 
         exit(0);
     }
    
     if(pid != 0){
+        printf("// father wait for the child //\n");
         wait(&status);
 
-        // printf("// iniside father //\n");
-        // printf("// allocate another 5 pages for child //\n");
+        printf("// iniside father //\n");
+        printf("// allocate another 5 pages for child //\n");
 
-        // for(int i = 5; i < 10; i++){
-        //     arr[i] = sbrk(PAGEZS);
-        // }
+        for(int i = 5; i < 10; i++){
+            arr[i] = sbrk(PAGEZS);
+        }
 
-        // sleep(10);
+        sleep(10);
 
-        // printf("// allocate another 10 pages for child //\n");
+        printf("// allocate another 10 pages for child //\n");
 
-        // for(int i = 10; i < 20; i++){
-        //     arr[i] = sbrk(PAGEZS);
-        // }
+        for(int i = 10; i < 20; i++){
+            arr[i] = sbrk(PAGEZS);
+        }
 
-        // printf("// no pagefault in the next 3 prints //\n");
+        printf("// no pagefault in the next 3 prints //\n");
 
-        // for(int i=16; i<19; i++){
-        //     printf("arr[%d] add : %p\n", i, arr[i]);
-        //     arr[i][0] = 1;
-        // }
+        for(int i=16; i<19; i++){
+            printf("arr[%d] add : %p\n", i, arr[i]);
+            arr[i][0] = 1;
+        }
 
-        // printf("// pagefault in the next 3 prints //\n");
+        printf("// pagefault in the next 3 prints //\n");
 
-        // for(int i=1; i<4; i++){
-        //     printf("arr[%d] add : %p\n", i, arr[i]);
-        //     arr[i][0] = 1;
-        // }
+        for(int i=1; i<4; i++){
+            printf("arr[%d] add : %p\n", i, arr[i]);
+            arr[i][0] = 1;
+        }
 
-        // printf("// father finish his job for today //\n");
+        printf("// father finish his job for today //\n");
 
     }
 }

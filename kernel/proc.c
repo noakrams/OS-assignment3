@@ -151,6 +151,8 @@ found:
 static void
 freeproc(struct proc *p)
 {
+  //printf("inside freeproc for %d, called by %d\n", p->pid, myproc()->pid);
+  //printf("p->pagetable: %p, myproc->pagetable %p\n", p->pagetable, myproc()->pagetable);
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
@@ -308,6 +310,7 @@ fork(void)
 
   #ifndef NONE
     if(np->pid>2){
+      printf("inside fork\n");
       // can't hold any keys when in function createSwap file
       release(&np->lock);
       createSwapFile(np);
@@ -319,6 +322,9 @@ fork(void)
       np->file_pages[i] = p->file_pages[i];
       }
 
+      np->ramPages = p->ramPages;
+      np->swapPages = p->swapPages;
+
       // TODO changed from the original version
       // char buf[PGSIZE/2];
       // for (int i = 0; i < MAX_TOTAL_PAGES * PGSIZE; i+=PGSIZE/2){
@@ -326,7 +332,7 @@ fork(void)
       //   writeToSwapFile(np,buf,i,PGSIZE/2);
       // }
 
-      if(np->shFlag){
+      if(p->pid != 2){
         char *buf = kalloc();
         for (int i = 0; i < MAX_TOTAL_PAGES; i++){
           release(&np->lock);
@@ -377,7 +383,7 @@ void
 exit(int status)
 {
   struct proc *p = myproc();
-
+  printf("inside exit, pid %d, p->ram: %d, p->swap: %d\n", p->pid, p->ramPages,p->swapPages);
   if(p == initproc)
     panic("init exiting");
 
@@ -401,16 +407,16 @@ exit(int status)
       for(int i = 0 ; i < MAX_PSYC_PAGES; i++){
         p->file_pages[i] = 0;
       }
-    }
+    
+      struct page_md *pagemd;
+      for(int i = 0; i< MAX_TOTAL_PAGES; i++){
+        pagemd = &p->total_pages[i];
+        page_md_free(pagemd);
+      }
 
-    struct page_md *pagemd;
-    for(int i = 0; i< MAX_TOTAL_PAGES; i++){
-      pagemd = &p->total_pages[i];
-      page_md_free(pagemd);
+      p->ramPages = 0;
+      p->swapPages = 0;
     }
-
-    p->ramPages = 0;
-    p->swapPages = 0;
 
   #endif
   acquire(&wait_lock);
@@ -427,7 +433,7 @@ exit(int status)
   p->state = ZOMBIE;
 
   release(&wait_lock);
-
+  printf("finish exit\n");
   // Jump into the scheduler, never to return.
   sched();
   panic("zombie exit");
@@ -733,13 +739,12 @@ add_page(uint64 va){
 
   if(p->pid <= 2 || p->shFlag)
     return;
-    
-  printf("inside add_page with pid %d\n", p->pid);
 
   struct page_md* pagemd;
   for (int i = 0; i < MAX_TOTAL_PAGES; i++) {
     pagemd = &p->total_pages[i];
     if (pagemd->stat == NONUSED) {
+        printf("add page, pid %d , page %d\n", p->pid, i);
         goto found;
     }
   }
@@ -770,7 +775,6 @@ void
 swap_out_if_neccessery(){
   
   struct proc* p = myproc();
-
   if(p->pid <= 2 || p->ramPages < MAX_PSYC_PAGES || p->shFlag)
     return;
 
@@ -801,19 +805,24 @@ find_page_by_va(uint64 va){
 
 void
 page_md_free(struct page_md* pagemd){
-
+  //printf("inside page_md_free\n");
   struct proc* p = myproc();
-  if(!pagemd)
+  if(!pagemd || pagemd->stat == NONUSED || p->pid <= 2)
     return;
+
   if(pagemd->stat == MEMORY){
+  printf("free page, pid %d, p->ram %d, p->swap %d\n", p->pid, p->ramPages, p->swapPages);  
 
     // TODO check which version is better
-
-    //pte_t *pte = walk (p->pagetable, pagemd->va, 0);
-    //uint64 pa = PTE2PA(*pte);
-    uint64 pa = walkaddr (p->pagetable, pagemd->va);
-    if(pa)
-      kfree((void*)pa);
+    //printf("send page to uvmunmap\n");
+    //uvmunmap(p->pagetable, pagemd->va,1,1);
+    pte_t *pte;
+    if((pte = walk(p->pagetable, pagemd->va, 0)) == 0)
+       panic("page_md_free: walk");
+    uint64 pa = PTE2PA(*pte);
+    //uint64 pa = walkaddr (p->pagetable, pagemd->va);
+    //if(pa)
+    kfree((void*)pa);
     p->ramPages--;
   }
   if(pagemd->stat == FILE){
@@ -824,6 +833,27 @@ page_md_free(struct page_md* pagemd){
   pagemd->va = 0;
   pagemd->offset = 0;
   pagemd->counter = 0;
+}
+
+void
+page_md_free2(uint64 pa, uint64 a, pagetable_t pagetable){
+  kfree((void*)pa);
+  struct proc *p = myproc();
+  // if(p->pagetable!=pagetable)
+  //   return;
+  for (int i = 0 ; i < MAX_TOTAL_PAGES; i++){
+    struct page_md *pagemd = &p->total_pages[i];
+    if(pagemd->stat!= NONUSED && pagemd->va == a){
+      printf("free2 page %d, pid%d\n", i, p->pid);
+      p->ramPages--;
+      pagemd->stat = NONUSED;
+      pagemd->ctime = 0;
+      pagemd->va = 0;
+      pagemd->offset = 0;
+      pagemd->counter = 0;
+      break;
+    }
+  }
 }
 
 int

@@ -156,7 +156,7 @@ pageToSwapFile(){
     pagemd -> stat = FILE;
     pagemd -> ctime = 0;
 
-    uint64 pa = walkaddr(p->pagetable, pagemd->va);
+    //uint64 pa = walkaddr(p->pagetable, pagemd->va);
     
     static char buf[PGSIZE];
     memset (buf,0,PGSIZE);
@@ -173,7 +173,7 @@ pageToSwapFile(){
 
     p->swapPages ++;
     p->ramPages --;
-    kfree((void*)pa);
+    //kfree((void*)pa);
     return 1;
 
   #else
@@ -224,7 +224,7 @@ pageToSwapFile(){
     pagemd -> stat = FILE;
     pagemd -> ctime = 0;
 
-    uint64 pa = walkaddr(p->pagetable, pagemd->va);
+    //uint64 pa = walkaddr(p->pagetable, pagemd->va);
     
     static char buf[PGSIZE];
     memset (buf,0,PGSIZE);
@@ -241,7 +241,7 @@ pageToSwapFile(){
 
     p->swapPages ++;
     p->ramPages --;
-    kfree((void*)pa);
+    //kfree((void*)pa);
     return 1;
 
   #endif

@@ -151,8 +151,6 @@ found:
 static void
 freeproc(struct proc *p)
 {
-  //printf("inside freeproc for %d, called by %d\n", p->pid, myproc()->pid);
-  //printf("p->pagetable: %p, myproc->pagetable %p\n", p->pagetable, myproc()->pagetable);
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
@@ -310,7 +308,6 @@ fork(void)
 
   #ifndef NONE
     if(np->pid>2){
-      printf("inside fork\n");
       // can't hold any keys when in function createSwap file
       release(&np->lock);
       createSwapFile(np);
@@ -318,11 +315,6 @@ fork(void)
 
       if(p->pid > 2){
       for (i = 0; i < MAX_TOTAL_PAGES; i++){
-        //struct page_md *pagemd = &p->total_pages[i];
-        //uint64 pa = walkaddr (p->pagetable, pagemd->va);
-        //uint64 pa2 = walkaddr (np->pagetable, pagemd->va);
-        //printf("fork: p->pid %d, va %p, pa %p\n", p->pid, pagemd->va, pa);
-        //printf("fork: p->pid %d, va %p, pa %p\n", np->pid, pagemd->va, pa2);
         memmove((void *) &np->total_pages[i], (void *) &p->total_pages[i], sizeof (struct page_md));
       }
 
@@ -503,11 +495,11 @@ update_AGING(){
     if(pagemd->stat == MEMORY){
         pte_t *pte = walk(p->pagetable, pagemd->va, 0);
         int accessed = *pte & PTE_A;
-        if(accessed)
-          printf("accessed = %d , va = %p\n", accessed, pagemd->va);
-        accessed<<=1; 
-        pagemd->counter >>= 1;
-        pagemd->counter |= accessed;  //change the last bit of the counter if need to
+        accessed<<=1;
+        if(accessed){ 
+          pagemd->counter = pagemd->counter >> 1;
+          pagemd->counter |= accessed;  //change the last bit of the counter if need to
+        }
         *pte &= ~PTE_A; // clear pte_a
     }
   }
@@ -753,9 +745,8 @@ add_page(uint64 va, pagetable_t pagetable){
     pagemd = &p->total_pages[i];
     if (pagemd->stat == NONUSED) {
         uint64 pa = walkaddr(p->pagetable, va);
-        //pte_t* pte = walk(p->pagetable, va , 0);
-        //*pte |= PTE_A;
-        printf("add page, pid %d , page %d, pa %p, va %p\n", p->pid, i, pa, va);
+        // pte_t* pte = walk(p->pagetable, va , 0);
+        // *pte |= PTE_A;
         goto found;
     }
   }
@@ -819,7 +810,6 @@ find_page_by_va(uint64 va){
 
 void
 page_md_free(struct page_md* pagemd){
-  //printf("inside page_md_free\n");
   struct proc* p = myproc();
 
   if(!pagemd || pagemd->stat == NONUSED || p->pid <= 2)
@@ -830,7 +820,6 @@ page_md_free(struct page_md* pagemd){
   pte_t * pte = walk (p->pagetable, pagemd->va, 0);
   if(!(*pte&PTE_U))
     return;
-  //printf("free page, pid %d, p->ram %d, p->swap %d pa %p, , va %p\n", p->pid, p->ramPages, p->swapPages, pa, pagemd->va);  
 
     // TODO check which version is better
     kfree((void*)pa);
@@ -843,7 +832,7 @@ page_md_free(struct page_md* pagemd){
   pagemd->ctime = 0;
   pagemd->va = -1;
   pagemd->offset = -1;
-  pagemd->counter = 0;
+ // pagemd->counter = 0;
 }
 
 void
@@ -865,13 +854,11 @@ page_md_free2(uint64 pa, uint64 a, pagetable_t pagetable){
   for (int i = 0 ; i < MAX_TOTAL_PAGES; i++){
     struct page_md *pagemd = &p->total_pages[i];
     if(pagemd->stat!= NONUSED && pagemd->va == a){
-      //printf("free2 page %d, pid%d, pa %p, va %p\n", i, p->pid, pa, a);
       p->ramPages--;
       pagemd->stat = NONUSED;
       pagemd->ctime = 0;
       pagemd->va = -1;
       pagemd->offset = -1;
-      pagemd->counter = 0;
       break;
     }
   }

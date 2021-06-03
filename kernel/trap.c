@@ -54,7 +54,7 @@ pageToSwapFile(){
 
     struct page_md *pagemd;
     int swapfile_offset;
-
+    
     // finding the lowest counter
 
     int min_value= 2147483647; //max value of int
@@ -62,10 +62,9 @@ pageToSwapFile(){
     for(int i = 0; i< MAX_TOTAL_PAGES; i++){
       pagemd = &p->total_pages[i];
       if(pagemd->stat == MEMORY){
-        //printf("counter is = %d\n", pagemd->counter);
         pte_t *tmpPTE = walk(p->pagetable, pagemd->va, 0);
-        if((*tmpPTE&PTE_U)){
-          if(pagemd->counter <= min_value){
+        if((*tmpPTE & PTE_U)){
+          if(pagemd->counter < min_value){
             min_value = pagemd->counter;
             min_page = i;
           }
@@ -82,12 +81,11 @@ pageToSwapFile(){
     // move the page to file
     pagemd = &p->total_pages[min_page];
     pagemd -> offset = swapfile_offset * PGSIZE;
-    pagemd -> counter = 0;
     pagemd -> stat = FILE;
     pagemd -> ctime = 0;
-    printf("ram -> swap : va %p, offset %d\n", pagemd->va, swapfile_offset);
+    //printf("ram -> swap : va in p %p, va in d = %d , offset %d\n", pagemd->va, pagemd->va, swapfile_offset);
 
-    //uint64 pa = walkaddr(p->pagetable, pagemd->va);
+   uint64 pa = walkaddr(p->pagetable, pagemd->va);
 
     static char buf[PGSIZE];
     memset (buf,0,PGSIZE);
@@ -104,8 +102,10 @@ pageToSwapFile(){
 
     p->swapPages ++;
     p->ramPages --;
-    
-    //kfree((void*)pa);
+
+    if(pagemd->va == 4096 || 20480)
+      return 1;
+    kfree((void*)pa);
     return 1;
 
   #else
@@ -128,7 +128,7 @@ pageToSwapFile(){
         pte_t *tmpPTE = walk(p->pagetable, (uint64)pagemd->va, 0);
         if((*tmpPTE&PTE_U)){
             int count = countBits(pagemd->counter);
-          if(count <= min_number_of_1){
+          if(count < min_number_of_1){
             min_number_of_1 = count;
             min_value = pagemd->counter;
             min_page = i;
@@ -152,11 +152,10 @@ pageToSwapFile(){
     // move the page to file
     pagemd = &p->total_pages[min_page];
     pagemd -> offset = swapfile_offset * PGSIZE;
-    pagemd -> counter = 0xFFFFFFFF;
     pagemd -> stat = FILE;
     pagemd -> ctime = 0;
 
-    //uint64 pa = walkaddr(p->pagetable, pagemd->va);
+    uint64 pa = walkaddr(p->pagetable, pagemd->va);
     
     static char buf[PGSIZE];
     memset (buf,0,PGSIZE);
@@ -173,7 +172,9 @@ pageToSwapFile(){
 
     p->swapPages ++;
     p->ramPages --;
-    //kfree((void*)pa);
+    if(pagemd->va == 4096 || 20480)
+      return 1;
+    kfree((void*)pa);
     return 1;
 
   #else
@@ -220,11 +221,10 @@ pageToSwapFile(){
     // move the page to file
     pagemd = &p->total_pages[place];
     pagemd -> offset = swapfile_offset * PGSIZE;
-    pagemd -> counter = 0;
     pagemd -> stat = FILE;
     pagemd -> ctime = 0;
 
-    //uint64 pa = walkaddr(p->pagetable, pagemd->va);
+    uint64 pa = walkaddr(p->pagetable, pagemd->va);
     
     static char buf[PGSIZE];
     memset (buf,0,PGSIZE);
@@ -241,7 +241,9 @@ pageToSwapFile(){
 
     p->swapPages ++;
     p->ramPages --;
-    //kfree((void*)pa);
+    if(pagemd->va == 4096 || 20480)
+      return 1;
+    kfree((void*)pa);
     return 1;
 
   #endif
@@ -291,7 +293,6 @@ usertrap(void)
   } else {
 
     #ifndef NONE
-      printf("in else pagedefault\n");
 
       uint64 scause = r_scause();
       uint64 stval = r_stval();
@@ -316,11 +317,9 @@ usertrap(void)
 
         found:
 
-        //printf("Page fault, read page from swapfile, va %p\n", va);
         // Read data from swap file to the virtual address of the page
         printf("swap -> ram : va %p, offset %d, pa %p\n", currPage->va, currPage->offset/PGSIZE, (uint64) PTE2PA(*pte));
         uint64 pa = PTE2PA(*pte);
-        //printf("currPage->offset %d, pa %p\n", (currPage->offset/PGSIZE));
         if(readFromSwapFile(p, (char*)pa, currPage->offset, PGSIZE) == -1)
           panic("can't read from swap file");
 
@@ -337,11 +336,9 @@ usertrap(void)
         currPage->offset = -1;
         currPage->stat = MEMORY;
         currPage->ctime = ticks;
-        //p->file_pages[currPage->offset/PGSIZE] = 0;
-
+      
         p->swapPages--;
         p->ramPages++;
-
 
       }
 

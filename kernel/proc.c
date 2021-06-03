@@ -325,13 +325,6 @@ fork(void)
       np->ramPages = p->ramPages;
       np->swapPages = p->swapPages;
       
-      // TODO changed from the original version
-      // char buf[PGSIZE/2];
-      // for (int i = 0; i < MAX_TOTAL_PAGES * PGSIZE; i+=PGSIZE/2){
-      //   readFromSwapFile(p,buf,i,PGSIZE/2);
-      //   writeToSwapFile(np,buf,i,PGSIZE/2);
-      // }
-      
       char *buf = kalloc();
       for (int i = 0; i < MAX_TOTAL_PAGES; i++){
         release(&np->lock);
@@ -744,7 +737,7 @@ add_page(uint64 va, pagetable_t pagetable){
   for (int i = 0; i < MAX_TOTAL_PAGES; i++) {
     pagemd = &p->total_pages[i];
     if (pagemd->stat == NONUSED) {
-        uint64 pa = walkaddr(p->pagetable, va);
+        //uint64 pa = walkaddr(p->pagetable, va);
         // pte_t* pte = walk(p->pagetable, va , 0);
         // *pte |= PTE_A;
         goto found;
@@ -821,9 +814,8 @@ page_md_free(struct page_md* pagemd){
   if(!(*pte&PTE_U))
     return;
 
-    // TODO check which version is better
-    kfree((void*)pa);
-    p->ramPages--;
+  kfree((void*)pa);
+  p->ramPages--;
   }
   if(pagemd->stat == FILE){
     p->swapPages--;
@@ -832,7 +824,6 @@ page_md_free(struct page_md* pagemd){
   pagemd->ctime = 0;
   pagemd->va = -1;
   pagemd->offset = -1;
- // pagemd->counter = 0;
 }
 
 void

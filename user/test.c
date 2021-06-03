@@ -7,9 +7,6 @@
 
 void simpleTest(){
    char* arr[32];
-//    arr[0] = 0;
-//    arr[1] = 0;
-//    arr[2] = 0;
 
     for(int i = 0; i < 5; i++){
         arr[i] = sbrk(PAGEZS);
@@ -58,14 +55,10 @@ void SanityTest(){
 
         sleep(10);
 
-        printf("// no pagefault in the next 3 prints //\n");
-
         for(int i=16; i<19; i++){
             printf("arr[%d] add : %p\n", i, arr[i]);
             arr[i][0] = 1;
         }
-
-        printf("// pagefault in the next 3 prints //\n");
 
         for(int i=1; i<4; i++){
             printf("arr[%d] add : %p\n", i, arr[i]);
@@ -96,14 +89,10 @@ void SanityTest(){
             arr[i] = sbrk(PAGEZS);
         }
 
-        printf("// no pagefault in the next 3 prints //\n");
-
         for(int i=16; i<19; i++){
             printf("arr[%d] add : %p\n", i, arr[i]);
             arr[i][0] = 1;
         }
-
-        printf("// pagefault in the next 3 prints //\n");
 
         for(int i=1; i<4; i++){
             printf("arr[%d] add : %p\n", i, arr[i]);
@@ -138,23 +127,19 @@ void forkTest(){
 
         sleep(10);
 
-        // for(int i = 10; i < 20; i++){
-        //     arr[i] = sbrk(PAGEZS);
-        // }
-
-        printf("// no pagefault in the next 5 prints //\n");
+        for(int i = 10; i < 20; i++){
+            arr[i] = sbrk(PAGEZS);
+        }
 
         for(int i=4; i<10; i++){
             printf("arr[%d] add : %p\n", i, arr[i]);
             arr[i][0] = 1;
         }
 
-        // printf("// pagefault in the next 5 prints //\n");
-
-        // for(int i=14; i<19; i++){
-        //     printf("arr[%d] add : %p\n", i, arr[i]);
-        //     arr[i][0] = 1;
-        // }
+        for(int i=14; i<19; i++){
+            printf("arr[%d] add : %p\n", i, arr[i]);
+            arr[i][0] = 1;
+        }
 
         printf("// child finish his job for today //\n");
 
@@ -175,15 +160,11 @@ void pageFaultTest(){
         arr[i] = sbrk(PAGEZS);
     }
 
-    printf("// no pagefault in the next 3 prints //\n");
-
     for(int i=16; i<19; i++){
         printf("arr[%d] add : %p\n", i, arr[i]);
         arr[i][0] = 1;
     }
    
-    printf("// pagefault in the next 3 prints //\n");
-
     for(int i=0; i<3; i++){
         printf("arr[%d] add : %p\n", i, arr[i]);
         arr[i][0] = 1;
@@ -245,17 +226,17 @@ main(int argc, char *argv[])
     // simpleFork();
     // test_number++;
 
-    printf("-----test no %d-----\n", test_number);
-    SanityTest();
-    test_number++;
+    // printf("-----test no %d-----\n", test_number);
+    // SanityTest();
+    // test_number++;
 
     // printf("\n-----test no %d-----\n", test_number);
     // forkTest();
     // test_number++;
 
-    // printf("\n-----test no %d-----\n", test_number);
-    // pageFaultTest();
-    // test_number++;
+    printf("\n-----test no %d-----\n", test_number);
+    pageFaultTest();
+    test_number++;
 
     printf("\nfinished test successfully\n");
     exit(0);

@@ -83,9 +83,8 @@ pageToSwapFile(){
     pagemd -> offset = swapfile_offset * PGSIZE;
     pagemd -> stat = FILE;
     pagemd -> ctime = 0;
-    //printf("ram -> swap : va in p %p, va in d = %d , offset %d\n", pagemd->va, pagemd->va, swapfile_offset);
 
-   uint64 pa = walkaddr(p->pagetable, pagemd->va);
+    uint64 pa = walkaddr(p->pagetable, pagemd->va);
 
     static char buf[PGSIZE];
     memset (buf,0,PGSIZE);
@@ -318,7 +317,7 @@ usertrap(void)
         found:
 
         // Read data from swap file to the virtual address of the page
-        printf("swap -> ram : va %p, offset %d, pa %p\n", currPage->va, currPage->offset/PGSIZE, (uint64) PTE2PA(*pte));
+        printf("Move file from swap file to memory\n");
         uint64 pa = PTE2PA(*pte);
         if(readFromSwapFile(p, (char*)pa, currPage->offset, PGSIZE) == -1)
           panic("can't read from swap file");

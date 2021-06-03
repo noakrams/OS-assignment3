@@ -3,6 +3,7 @@
 #include "user/user.h"
 
 #define PAGEZS 4096
+#define PGSIZE 4096
 
 void simpleTest(){
    char* arr[32];
@@ -189,6 +190,47 @@ void pageFaultTest(){
     }
 }
 
+// test sbrk with different sizes - should cause 1 page fault
+void test_sbrk(){
+  int pid = fork();
+  char *a; 
+
+  if(pid == 0){
+    int sz = (uint64) sbrk(0);
+    a = sbrk(-sz);
+    printf("did sbrk 1 %p\n", a);
+    // user page fault - all code was deleted
+    exit(0);
+  }
+  else
+    wait(0);
+
+  pid = fork();
+  if(pid == 0){
+    int sz = (uint64) sbrk(0);
+    printf("did sbrk 2 %p\n", sz);
+    // delete half of size
+    a = sbrk(-(sz - 1500));
+    exit(0);
+  }
+  wait(0);
+
+  pid = fork();
+  if(pid == 0){
+    int sz = (uint64) sbrk(0);
+    sbrk((10*PGSIZE + 2048) - sz);
+    // delete just a bit
+    a = sbrk(-10);
+    printf("did sbrk 3 %p\n", a);
+    exit(0);
+  }
+  else{
+    wait(0);
+    printf("finised\n");
+    exit(0);
+  }
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -203,17 +245,17 @@ main(int argc, char *argv[])
     // simpleFork();
     // test_number++;
 
-    // printf("-----test no %d-----\n", test_number);
-    // SanityTest();
-    // test_number++;
+    printf("-----test no %d-----\n", test_number);
+    SanityTest();
+    test_number++;
 
     // printf("\n-----test no %d-----\n", test_number);
     // forkTest();
     // test_number++;
 
-    printf("\n-----test no %d-----\n", test_number);
-    pageFaultTest();
-    test_number++;
+    // printf("\n-----test no %d-----\n", test_number);
+    // pageFaultTest();
+    // test_number++;
 
     printf("\nfinished test successfully\n");
     exit(0);

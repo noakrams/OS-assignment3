@@ -62,6 +62,7 @@ pageToSwapFile(){
     for(int i = 0; i< MAX_TOTAL_PAGES; i++){
       pagemd = &p->total_pages[i];
       if(pagemd->stat == MEMORY){
+        //printf("counter is = %d\n", pagemd->counter);
         pte_t *tmpPTE = walk(p->pagetable, pagemd->va, 0);
         if((*tmpPTE&PTE_U)){
           if(pagemd->counter <= min_value){
@@ -86,7 +87,7 @@ pageToSwapFile(){
     pagemd -> ctime = 0;
     printf("ram -> swap : va %p, offset %d\n", pagemd->va, swapfile_offset);
 
-    uint64 pa = walkaddr(p->pagetable, pagemd->va);
+    //uint64 pa = walkaddr(p->pagetable, pagemd->va);
 
     static char buf[PGSIZE];
     memset (buf,0,PGSIZE);
@@ -103,7 +104,8 @@ pageToSwapFile(){
 
     p->swapPages ++;
     p->ramPages --;
-    kfree((void*)pa);
+    
+    //kfree((void*)pa);
     return 1;
 
   #else
@@ -289,6 +291,7 @@ usertrap(void)
   } else {
 
     #ifndef NONE
+      printf("in else pagedefault\n");
 
       uint64 scause = r_scause();
       uint64 stval = r_stval();

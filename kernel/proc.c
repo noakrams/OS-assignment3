@@ -503,6 +503,8 @@ update_AGING(){
     if(pagemd->stat == MEMORY){
         pte_t *pte = walk(p->pagetable, pagemd->va, 0);
         int accessed = *pte & PTE_A;
+        if(accessed)
+          printf("accessed = %d , va = %p\n", accessed, pagemd->va);
         accessed<<=1; 
         pagemd->counter >>= 1;
         pagemd->counter |= accessed;  //change the last bit of the counter if need to
@@ -751,6 +753,8 @@ add_page(uint64 va, pagetable_t pagetable){
     pagemd = &p->total_pages[i];
     if (pagemd->stat == NONUSED) {
         uint64 pa = walkaddr(p->pagetable, va);
+        //pte_t* pte = walk(p->pagetable, va , 0);
+        //*pte |= PTE_A;
         printf("add page, pid %d , page %d, pa %p, va %p\n", p->pid, i, pa, va);
         goto found;
     }
@@ -817,6 +821,7 @@ void
 page_md_free(struct page_md* pagemd){
   //printf("inside page_md_free\n");
   struct proc* p = myproc();
+
   if(!pagemd || pagemd->stat == NONUSED || p->pid <= 2)
     return;
 
@@ -846,13 +851,14 @@ page_md_free2(uint64 pa, uint64 a, pagetable_t pagetable){
   struct proc* p = myproc();
   if(p->pagetable!=pagetable)
     return;
-  kfree((void*)pa);  
-
-  if(p->pid<=2 && !p->shFlag)
-    return;
 
   pte_t *pte = walk (pagetable, a, 0);
   if(!(*pte&PTE_U))
+    return;
+
+  kfree((void*)pa);
+
+  if(p->pid<=2 && !p->shFlag)
     return;
 
 

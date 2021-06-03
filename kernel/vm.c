@@ -276,15 +276,16 @@ uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 
   #ifndef NONE
     uint64 a;
-    struct page_md* pageToRemove;
+    //struct page_md* pageToRemove;
     printf("inside uvmdealloc\n");
 
     if(pidBiggerThan2()){
       newsz = PGROUNDDOWN(newsz);
       for (a = newsz; a < oldsz; a += PGSIZE) {
-        if((pageToRemove = find_page_by_va((uint64)a)) == 0)
-          panic("didn't found the page");
-        page_md_free(pageToRemove); 
+        // if((pageToRemove = find_page_by_va((uint64)a)) == 0)
+        //   panic("didn't found the page");
+        uint pa = walkaddr(pagetable, a);
+        page_md_free2(pa, a, pagetable); 
       }
     }
   #endif
